@@ -45,4 +45,4 @@ async function fetchStockPrice(ticker: string, apiKey: string) {
   } catch {
     return {
       ticker,
-      ok: fals
+      ok: false

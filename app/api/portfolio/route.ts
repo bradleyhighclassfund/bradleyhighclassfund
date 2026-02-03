@@ -2,113 +2,110 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
-type Position = {
+type Holding = {
   ticker: string;
   name: string;
   shares: number;
-  cost_basis: number | null; // total cost basis dollars
-};
-
-type HoldingRow = {
-  ticker: string;
-  name: string;
-  shares: number;
-  cost_basis: number | null;
-  cost_basis_per_share: number | null;
-  last_price: number | null;
-  market_value: number | null;
-  weight: number | null;
-  unrealized_pl: number | null;
-  unrealized_pl_pct: number | null;
+  cost_basis: number;
 };
 
 async function fetchPrice(ticker: string, apiKey: string): Promise<number | null> {
-  const url = `https://api.api-ninjas.com/v1/stockprice?ticker=${encodeURIComponent(ticker)}`;
-  const res = await fetch(url, {
-    headers: { "X-Api-Key": apiKey },
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
+  try {
+    const url = `https://api.api-ninjas.com/v1/stockprice?ticker=${encodeURIComponent(
+      ticker
+    )}`;
 
-  const j: any = await res.json();
-  return typeof j?.price === "number" ? j.price : null;
+    const res = await fetch(url, {
+      headers: {
+        "X-Api-Key": apiKey,
+      },
+      cache: "no-store",
+    });
+
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    return typeof json.price === "number" ? json.price : null;
+  } catch {
+    return null;
+  }
 }
-
-export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const positionsPath = path.join(process.cwd(), "data", "positions.json");
-    const positions = JSON.parse(fs.readFileSync(positionsPath, "utf-8")) as Position[];
-
-    const apiKey = process.env.API_NINJAS_KEY || null;
-
-    // Fetch prices in parallel (faster than one-by-one)
-    const tickers = positions.map((p) => p.ticker.toUpperCase());
-    const prices: Record<string, number | null> = {};
-
-    if (apiKey) {
-      const CONCURRENCY = 8;
-      let i = 0;
-
-      async function worker() {
-        while (i < tickers.length) {
-          const t = tickers[i++];
-          prices[t] = await fetchPrice(t, apiKey);
-        }
-      }
-
-      await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
-    } else {
-      // No key: return rows with null prices instead of failing
-      for (const t of tickers) prices[t] = null;
+    const apiKey = process.env.API_NINJAS_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "Missing API_NINJAS_KEY" },
+        { status: 500 }
+      );
     }
 
-    const rows: HoldingRow[] = positions.map((p) => {
-      const t = p.ticker.toUpperCase();
-      const last = prices[t];
-      const mv = last == null ? null : last * p.shares;
+    const filePath = path.join(
+      process.cwd(),
+      "data",
+      "Individual-Positions-2026-02-02-205634.csv"
+    );
 
-      const cbps = p.cost_basis == null ? null : p.cost_basis / p.shares;
+    const raw = fs.readFileSync(filePath, "utf8");
+    const lines = raw.trim().split("\n");
 
-      const upl =
-        mv == null || p.cost_basis == null ? null : mv - p.cost_basis;
-
-      const uplPct =
-        upl == null || p.cost_basis == null || p.cost_basis === 0
-          ? null
-          : upl / p.cost_basis;
+    const holdings: Holding[] = lines.slice(1).map((line) => {
+      const [ticker, name, shares, cost_basis] = line.split(",");
 
       return {
-        ticker: t,
-        name: p.name,
-        shares: p.shares,
-        cost_basis: p.cost_basis,
-        cost_basis_per_share: cbps,
-        last_price: last,
-        market_value: mv,
-        weight: null,
-        unrealized_pl: upl,
-        unrealized_pl_pct: uplPct,
+        ticker: ticker.trim(),
+        name: name.trim(),
+        shares: Number(shares),
+        cost_basis: Number(cost_basis),
       };
     });
 
-    const totalMV = rows.reduce((acc, r) => acc + (r.market_value ?? 0), 0);
-    const rowsWithWeights = rows.map((r) => ({
-      ...r,
-      weight: r.market_value == null || totalMV === 0 ? null : r.market_value / totalMV,
-    }));
+    const prices: Record<string, number | null> = {};
 
-    return NextResponse.json(
-      {
-        last_updated: new Date().toISOString(),
-        total_market_value: totalMV,
-        holdings: rowsWithWeights,
-        note: apiKey ? null : "API_NINJAS_KEY not set; prices/market value will be blank.",
-      },
-      { status: 200 }
+    // ---- controlled concurrency ----
+    const CONCURRENCY = 6;
+    let i = 0;
+
+    async function worker() {
+      while (i < holdings.length) {
+        const h = holdings[i++];
+        prices[h.ticker] = await fetchPrice(h.ticker, apiKey);
+      }
+    }
+
+    await Promise.all(
+      Array.from({ length: CONCURRENCY }, () => worker())
     );
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "unknown error" }, { status: 500 });
+
+    const enriched = holdings.map((h) => {
+      const price = prices[h.ticker];
+      const market_value = price ? price * h.shares : 0;
+
+      return {
+        ticker: h.ticker,
+        name: h.name,
+        shares: h.shares,
+        cost_basis: h.cost_basis,
+        last_price: price,
+        market_value,
+      };
+    });
+
+    const total_market_value = enriched.reduce(
+      (sum, h) => sum + h.market_value,
+      0
+    );
+
+    return NextResponse.json({
+      last_updated: new Date().toISOString(),
+      total_market_value,
+      holdings: enriched,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err?.message ?? "Server error" },
+      { status: 500 }
+    );
   }
 }

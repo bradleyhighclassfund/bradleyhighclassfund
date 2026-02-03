@@ -1,5 +1,5 @@
 [
-  { "ticker": "ABT", "shares": 10 , "cost basis': 957},
+  { "ticker": "ABT", "shares": 10 , "cost basis": 957},
   { "ticker": "ACCO", "shares": 4 },
   { "ticker": "ADBE", "shares": 3 },
   { "ticker": "AMCR", "shares": 50 },

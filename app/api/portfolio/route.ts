@@ -1,105 +1,97 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
+import fs from "fs/promises";
 import path from "path";
 
-type Holding = {
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type RawHolding = {
   ticker: string;
-  name: string;
+  name?: string;
   shares: number;
-  cost_basis: number;
+  price?: number; // EOD price from your file
+  market_value?: number; // optional; if missing we compute shares * price
+  cost_basis?: number | null; // total cost basis
 };
 
-type PortfolioResponse = {
-  last_updated: string;
-  total_market_value: number;
-  holdings: Array<
-    Holding & {
-      last_price: number;
-      market_value: number;
-      weight: number;
-    }
-  >;
+type ActiveHoldingsFile = {
+  last_updated?: string;
+  source?: string;
+  holdings: RawHolding[];
 };
 
-async function fetchPrice(ticker: string, apiKey?: string): Promise<number> {
-  if (!apiKey) return 0;
-
-  const url = `https://api.api-ninjas.com/v1/stockprice?ticker=${encodeURIComponent(
-    ticker
-  )}`;
-
-  const res = await fetch(url, {
-    headers: { "X-Api-Key": apiKey },
-    cache: "no-store",
-  });
-
-  if (!res.ok) return 0;
-
-  const json = await res.json();
-  return typeof json.price === "number" ? json.price : 0;
+function num(v: unknown, fallback = 0): number {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 export async function GET() {
   try {
-    const filePath = path.join(
-      process.cwd(),
-      "data",
-      "active_holdings.json"
-    );
+    const filePath = path.join(process.cwd(), "data", "active_holdings.json");
+    const rawText = await fs.readFile(filePath, "utf-8");
 
-    if (!fs.existsSync(filePath)) {
-      return NextResponse.json(
-        { error: "active_holdings.json not found in /data" },
-        { status: 500 }
-      );
-    }
+    const parsed = JSON.parse(rawText) as ActiveHoldingsFile;
+    const holdings = Array.isArray(parsed.holdings) ? parsed.holdings : [];
 
-    const raw = fs.readFileSync(filePath, "utf-8");
-    const holdings: Holding[] = JSON.parse(raw);
+    const normalized = holdings
+      .map((h) => {
+        const ticker = (h.ticker ?? "").toString().trim().toUpperCase();
+        const name = (h.name ?? "").toString().trim();
+        const shares = num(h.shares, 0);
 
-    const apiKey = process.env.API_NINJAS_KEY;
+        const price = num(h.price, 0);
 
-    const prices: Record<string, number> = {};
+        const marketValue =
+          h.market_value === undefined || h.market_value === null
+            ? shares * price
+            : num(h.market_value, shares * price);
 
-    for (const h of holdings) {
-      prices[h.ticker] = await fetchPrice(h.ticker, apiKey);
-    }
+        const costBasis = h.cost_basis === undefined ? null : h.cost_basis;
 
-    const enriched = holdings.map((h) => {
-      const last_price = prices[h.ticker] ?? 0;
-      const market_value = last_price * h.shares;
+        return {
+          ticker,
+          name,
+          shares,
+          last_price: price,
+          market_value: marketValue,
+          cost_basis: costBasis,
+        };
+      })
+      .filter((h) => h.ticker.length > 0 && h.shares > 0);
 
-      return {
-        ...h,
-        last_price,
-        market_value,
-        weight: 0, // placeholder
-      };
-    });
-
-    const total_market_value = enriched.reduce(
-      (sum, h) => sum + h.market_value,
+    const totalMarketValue = normalized.reduce(
+      (sum, h) => sum + num(h.market_value, 0),
       0
     );
 
-    const finalHoldings = enriched.map((h) => ({
+    const withWeights = normalized.map((h) => ({
       ...h,
-      weight:
-        total_market_value > 0
-          ? h.market_value / total_market_value
-          : 0,
+      weight: totalMarketValue > 0 ? num(h.market_value, 0) / totalMarketValue : 0,
     }));
 
-    const response: PortfolioResponse = {
-      last_updated: new Date().toISOString(),
-      total_market_value,
-      holdings: finalHoldings,
-    };
+    // Sort by market value desc, then ticker
+    withWeights.sort(
+      (a, b) =>
+        num(b.market_value, 0) - num(a.market_value, 0) ||
+        a.ticker.localeCompare(b.ticker)
+    );
 
-    return NextResponse.json(response);
+    return NextResponse.json(
+      {
+        last_updated: parsed.last_updated ?? new Date().toISOString(),
+        source: parsed.source ?? "data/active_holdings.json",
+        total_market_value: totalMarketValue,
+        holdings: withWeights,
+      },
+      { headers: { "cache-control": "no-store" } }
+    );
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message ?? "Unknown server error" },
+      {
+        error:
+          err?.message ??
+          "Failed to load holdings. Ensure data/active_holdings.json exists and is valid JSON.",
+      },
       { status: 500 }
     );
   }

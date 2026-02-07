@@ -1,105 +1,141 @@
-export const dynamic = "force-dynamic";
+"use client";
 
-type HoldingRow = {
+import { useEffect, useMemo, useState } from "react";
+
+type Holding = {
   ticker: string;
   name?: string;
   shares: number;
-  last_price: number;
-  market_value: number;
-  weight: number;
+  last_price?: number | null;
+  market_value?: number | null;
+  weight?: number | null;
   cost_basis?: number | null;
 };
 
 type PortfolioResponse = {
   last_updated: string;
+  quote_as_of?: string;
   total_market_value: number;
-  holdings: HoldingRow[];
-  error?: string;
+  holdings: Holding[];
 };
 
-function money(n: number | null | undefined) {
-  if (n === null || n === undefined || Number.isNaN(n)) return "N/A";
-  return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+function fmtMoney(x: number | null | undefined) {
+  const v = typeof x === "number" && Number.isFinite(x) ? x : 0;
+  return v.toLocaleString(undefined, { style: "currency", currency: "USD" });
 }
 
-export default async function PortfolioPage() {
-  let data: PortfolioResponse | null = null;
-  let errorText = "";
+function fmtNum(x: number | null | undefined, digits = 2) {
+  const v = typeof x === "number" && Number.isFinite(x) ? x : 0;
+  return v.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
 
-  try {
-    // Use relative URL so it works on Vercel without env vars
-    const res = await fetch("/api/portfolio", { cache: "no-store" });
-    const text = await res.text();
-    const parsed = JSON.parse(text) as PortfolioResponse;
+function fmtPct(x: number | null | undefined) {
+  const v = typeof x === "number" && Number.isFinite(x) ? x : 0;
+  return `${(v * 100).toFixed(2)}%`;
+}
 
-    if (!res.ok) {
-      errorText = `Failed to load portfolio (HTTP ${res.status}).`;
-      if ((parsed as any)?.error) errorText += `\n${(parsed as any).error}`;
-    } else {
-      data = parsed;
+export default function PortfolioPage() {
+  const [data, setData] = useState<PortfolioResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setErr(null);
+
+        // Browser fetch to same-origin API route
+        const res = await fetch("/api/portfolio", { cache: "no-store" });
+
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          throw new Error(`HTTP ${res.status} ${txt}`);
+        }
+
+        const json = (await res.json()) as PortfolioResponse;
+        if (!cancelled) setData(json);
+      } catch (e: any) {
+        if (!cancelled) setErr(e?.message ?? "Unknown error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-  } catch (e: any) {
-    errorText = `Failed to load portfolio. ${e?.message ?? ""}`.trim();
-  }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const rows = useMemo(() => {
+    if (!data?.holdings) return [];
+    return [...data.holdings].sort((a, b) => (a.ticker || "").localeCompare(b.ticker || ""));
+  }, [data]);
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1 style={{ fontSize: 44, margin: "12px 0 18px" }}>Portfolio</h1>
+    <main style={{ padding: "24px" }}>
+      <h1 style={{ fontSize: "48px", fontWeight: 700, warn: "none" as any }}>Portfolio</h1>
 
-      {errorText ? (
-        <pre style={{ color: "crimson", whiteSpace: "pre-wrap" }}>{errorText}</pre>
-      ) : null}
+      {loading && <p style={{ marginTop: 16 }}>Loading…</p>}
 
-      {data ? (
+      {!loading && err && (
+        <div style={{ marginTop: 16, color: "crimson" }}>
+          <div>Failed to load portfolio.</div>
+          <pre style={{ whiteSpace: "pre-wrap" }}>{err}</pre>
+        </div>
+      )}
+
+      {!loading && !err && data && (
         <>
-          <p style={{ marginTop: 8 }}>
-            Last updated: <b>{data.last_updated}</b>
-          </p>
+          <div style={{ marginTop: 16 }}>
+            <div>
+              <strong>Last updated:</strong> {data.last_updated}
+            </div>
+            {data.quote_as_of ? (
+              <div>
+                <strong>Quote as of:</strong> {data.quote_as_of}
+              </div>
+            ) : null}
+            <div style={{ marginTop: 8 }}>
+              <strong>Total market value:</strong> {fmtMoney(data.total_market_value)}
+            </div>
+          </div>
 
-          <p style={{ marginTop: 8 }}>
-            Total market value: <b>{money(data.total_market_value)}</b>
-          </p>
-
-          <table
-            cellPadding={10}
-            style={{
-              borderCollapse: "collapse",
-              width: "100%",
-              fontSize: 14,
-              marginTop: 16,
-            }}
-          >
-            <thead>
-              <tr style={{ borderBottom: "2px solid #eee" }}>
-                <th align="left">Ticker</th>
-                <th align="left">Name</th>
-                <th align="right">Shares</th>
-                <th align="right">EOD Price</th>
-                <th align="right">Market Value</th>
-                <th align="right">Weight</th>
-                <th align="right">Cost Basis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(data.holdings ?? []).map((r) => (
-                <tr key={r.ticker} style={{ borderTop: "1px solid #eee" }}>
-                  <td>{r.ticker}</td>
-                  <td>{r.name ?? ""}</td>
-                  <td align="right">{r.shares}</td>
-                  <td align="right">{Number(r.last_price).toFixed(2)}</td>
-                  <td align="right">{money(r.market_value)}</td>
-                  <td align="right">{(r.weight * 100).toFixed(2)}%</td>
-                  <td align="right">{r.cost_basis == null ? "N/A" : money(r.cost_basis)}</td>
+          <div style={{ marginTop: 18, overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #ddd" }}>
+                  <th style={{ textAlign: "left", padding: "10px 8px" }}>Ticker</th>
+                  <th style={{ textAlign: "left", padding: "10px 8px" }}>Name</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px" }}>Shares</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px" }}>Last Price</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px" }}>Market Value</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px" }}>Weight</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px" }}>Cost Basis</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <p style={{ marginTop: 16, fontSize: 12, color: "#444" }}>
-            Prices shown are end-of-day prices taken from your broker export (not live quotes).
-          </p>
+              </thead>
+              <tbody>
+                {rows.map((h) => (
+                  <tr key={h.ticker} style={{ borderBottom: "1px solid #eee" }}>
+                    <td style={{ padding: "10px 8px" }}>{h.ticker}</td>
+                    <td style={{ padding: "10px 8px" }}>{h.name ?? ""}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right" }}>{fmtNum(h.shares, 0)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right" }}>{fmtNum(h.last_price ?? 0, 2)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right" }}>{fmtMoney(h.market_value ?? 0)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right" }}>{fmtPct(h.weight ?? 0)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right" }}>
+                      {h.cost_basis == null ? "" : fmtMoney(h.cost_basis)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
-      ) : null}
+      )}
     </main>
   );
 }

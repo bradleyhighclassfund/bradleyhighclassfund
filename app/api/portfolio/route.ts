@@ -1,192 +1,177 @@
 import { NextResponse } from "next/server";
-import fs from "fs/promises";
 import path from "path";
+import fs from "fs/promises";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-type HoldingInput = {
+type Holding = {
   ticker: string;
-  name?: string;
   shares: number;
-  cost_basis?: number | null; // total cost basis dollars
+  name?: string | null;
+  cost_basis?: number | null; // total dollars
 };
 
-type ActiveHoldingsFile = {
-  last_updated?: string;
-  source?: string;
-  holdings: HoldingInput[];
+type EodPrice = {
+  close: number;
+  date: string; // YYYY-MM-DD
 };
 
-type EodCache = {
-  asof: string; // YYYY-MM-DD (UTC)
-  prices: Record<string, { close: number; date: string }>; // ticker -> {close, date}
+type PriceCache = {
+  asOf: string; // ISO time when cache was written
+  prices: Record<string, EodPrice>;
 };
 
-function toNum(v: unknown, fallback = 0): number {
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : fallback;
+function projectPath(...parts: string[]) {
+  return path.join(process.cwd(), ...parts);
 }
 
-function utcDateYYYYMMDD(d = new Date()): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+function normalizeTicker(t: string) {
+  return (t || "").trim().toUpperCase();
 }
 
-/**
- * Stooq symbols for US equities are typically like: aapl.us
- * We'll try a couple variants for dot-tickers (e.g., BRK.B):
- * - brk.b.us
- * - brk-b.us
- */
-function stooqSymbolCandidates(ticker: string): string[] {
-  const t = ticker.trim().toLowerCase();
-  const base = t.replace(/\s+/g, "");
-  const cand = new Set<string>();
-  cand.add(`${base}.us`);
-  if (base.includes(".")) cand.add(`${base.replace(/\./g, "-")}.us`);
-  // Some brokers use "/" in tickers; try dash variant
-  if (base.includes("/")) cand.add(`${base.replace(/\//g, "-")}.us`);
-  return Array.from(cand);
+// Free EOD data from Stooq (usually works for US tickers with .US suffix)
+async function fetchEodCloseFromStooq(ticker: string): Promise<EodPrice | null> {
+  const t = normalizeTicker(ticker);
+  if (!t) return null;
+
+  const url = `https://stooq.com/q/l/?s=${encodeURIComponent(t.toLowerCase())}.us&i=d`;
+
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: { "User-Agent": "bradleyhighclassfund/1.0" },
+  });
+
+  if (!res.ok) return null;
+
+  const text = await res.text();
+  // CSV format:
+  // Date,Open,High,Low,Close,Volume
+  // 2026-02-06,xxx,xxx,xxx,123.45,999999
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return null;
+
+  const header = lines[0].split(",");
+  const row = lines[lines.length - 1].split(",");
+
+  const dateIdx = header.findIndex((h) => h.toLowerCase() === "date");
+  const closeIdx = header.findIndex((h) => h.toLowerCase() === "close");
+
+  if (dateIdx < 0 || closeIdx < 0) return null;
+
+  const date = row[dateIdx];
+  const close = Number(row[closeIdx]);
+
+  if (!date || !Number.isFinite(close) || close <= 0) return null;
+
+  return { date, close };
 }
 
-async function fetchStooqCloseForTicker(ticker: string): Promise<{ close: number; date: string } | null> {
-  const candidates = stooqSymbolCandidates(ticker);
-
-  for (const sym of candidates) {
-    // Stooq daily CSV (last rows include latest close; EOD updates after market close)
-    const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}&i=d`;
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) continue;
-
-    const text = await res.text();
-    // CSV format: Date,Open,High,Low,Close,Volume
-    const lines = text.trim().split(/\r?\n/);
-    if (lines.length < 2) continue;
-
-    const last = lines[lines.length - 1];
-    const parts = last.split(",");
-    if (parts.length < 5) continue;
-
-    const date = parts[0]?.trim();
-    const close = Number(parts[4]);
-
-    if (date && Number.isFinite(close) && close > 0) {
-      return { close, date };
-    }
-  }
-
-  return null;
+async function readJsonFile<T>(filePath: string): Promise<T> {
+  const raw = await fs.readFile(filePath, "utf-8");
+  return JSON.parse(raw) as T;
 }
 
-async function readJsonIfExists<T>(p: string): Promise<T | null> {
-  try {
-    const txt = await fs.readFile(p, "utf-8");
-    return JSON.parse(txt) as T;
-  } catch {
-    return null;
-  }
-}
-
-async function writeJson(p: string, obj: any): Promise<void> {
-  await fs.mkdir(path.dirname(p), { recursive: true });
-  await fs.writeFile(p, JSON.stringify(obj, null, 2), "utf-8");
+async function writeJsonFile(filePath: string, obj: any) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, JSON.stringify(obj, null, 2), "utf-8");
 }
 
 export async function GET() {
   try {
-    const holdingsPath = path.join(process.cwd(), "data", "active_holdings.json");
-    const raw = await fs.readFile(holdingsPath, "utf-8");
-    const parsed = JSON.parse(raw) as ActiveHoldingsFile;
+    const holdingsPath = projectPath("data", "active_holdings.json");
+    const cachePath = projectPath("data", "cache", "eod_prices.json");
 
-    const holdingsIn = Array.isArray(parsed.holdings) ? parsed.holdings : [];
-    const holdings = holdingsIn
-      .map((h) => ({
-        ticker: (h.ticker ?? "").toString().trim().toUpperCase(),
-        name: (h.name ?? "").toString().trim(),
-        shares: toNum(h.shares, 0),
-        cost_basis: h.cost_basis ?? null,
-      }))
-      .filter((h) => h.ticker && h.shares > 0);
-
-    // Daily cache: avoids slow loads & repeated hits to Stooq
-    const cachePath = path.join(process.cwd(), "data", "cache", "eod_prices.json");
-    const today = utcDateYYYYMMDD();
-    const cache = (await readJsonIfExists<EodCache>(cachePath)) ?? { asof: "", prices: {} };
-
-    const prices: EodCache["prices"] = cache.asof === today ? cache.prices : {};
-
-    // Fetch missing tickers (with controlled concurrency)
-    const need = holdings
-      .map((h) => h.ticker)
-      .filter((t) => !(t in prices));
-
-    const CONCURRENCY = 6;
-    let i = 0;
-
-    async function worker() {
-      while (i < need.length) {
-        const t = need[i++];
-        const q = await fetchStooqCloseForTicker(t);
-        if (q) {
-          prices[t] = { close: q.close, date: q.date };
-        }
-      }
+    // Load holdings
+    let holdingsRaw: Holding[];
+    try {
+      holdingsRaw = await readJsonFile<Holding[]>(holdingsPath);
+    } catch {
+      return NextResponse.json(
+        { error: `Holdings file not found: ${holdingsPath}. Commit data/active_holdings.json to GitHub.` },
+        { status: 500 }
+      );
     }
 
-    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+    const holdings: Holding[] = (holdingsRaw || [])
+      .map((h) => ({
+        ticker: normalizeTicker(h.ticker),
+        shares: Number(h.shares || 0),
+        name: h.name ?? null,
+        cost_basis: h.cost_basis ?? null,
+      }))
+      .filter((h) => h.ticker && Number.isFinite(h.shares) && h.shares > 0);
 
-    // Persist refreshed cache for the day
-    await writeJson(cachePath, { asof: today, prices });
+    // Load cache if present
+    let cache: PriceCache | null = null;
+    try {
+      cache = await readJsonFile<PriceCache>(cachePath);
+    } catch {
+      cache = null;
+    }
 
+    const now = new Date();
+    const cacheAgeMs = cache?.asOf ? now.getTime() - new Date(cache.asOf).getTime() : Number.POSITIVE_INFINITY;
+
+    // Refresh cache if older than 12 hours or missing
+    const needRefresh = !cache || !cache.prices || cacheAgeMs > 12 * 60 * 60 * 1000;
+
+    const prices: Record<string, EodPrice> = { ...(cache?.prices || {}) };
+
+    if (needRefresh) {
+      for (const h of holdings) {
+        if (!prices[h.ticker]) {
+          const p = await fetchEodCloseFromStooq(h.ticker);
+          if (p) prices[h.ticker] = p;
+        }
+      }
+
+      // Also refresh any stale/invalid entries (optional light pass)
+      // If you want every ticker refreshed daily, uncomment this block:
+      /*
+      for (const h of holdings) {
+        const p = await fetchEodCloseFromStooq(h.ticker);
+        if (p) prices[h.ticker] = p;
+      }
+      */
+
+      await writeJsonFile(cachePath, { asOf: now.toISOString(), prices } satisfies PriceCache);
+    }
+
+    // Compute totals
     const rows = holdings.map((h) => {
-      const q = prices[h.ticker] ?? null;
-      const last_price = q?.close ?? 0;
-      const market_value = last_price * h.shares;
-
-      const cost_basis = h.cost_basis;
-      const unrealized_pl =
-        cost_basis == null ? null : market_value - cost_basis;
-      const unrealized_pl_pct =
-        cost_basis == null || cost_basis === 0 ? null : (market_value - cost_basis) / cost_basis;
+      const p = prices[h.ticker];
+      const last_price = p?.close ?? null;
+      const market_value = last_price ? h.shares * last_price : null;
 
       return {
         ticker: h.ticker,
-        name: h.name,
+        name: h.name ?? null,
         shares: h.shares,
-        cost_basis,
-        price_date: q?.date ?? null,      // EOD date from Stooq
-        last_price,                       // EOD close
+        cost_basis: h.cost_basis ?? null,
+        last_price,
         market_value,
-        unrealized_pl,
-        unrealized_pl_pct,
+        weight: null as number | null,
       };
     });
 
-    const total_market_value = rows.reduce((s, r) => s + r.market_value, 0);
+    const total_market_value = rows.reduce((sum, r) => sum + (r.market_value ?? 0), 0);
 
-    const holdingsOut = rows
-      .map((r) => ({
-        ...r,
-        weight: total_market_value > 0 ? r.market_value / total_market_value : 0,
-      }))
-      .sort((a, b) => b.market_value - a.market_value);
+    for (const r of rows) {
+      r.weight = total_market_value > 0 && r.market_value != null ? r.market_value / total_market_value : 0;
+    }
 
-    return NextResponse.json(
-      {
-        last_updated: new Date().toISOString(),
-        pricing: "EOD Close (Stooq)",
-        total_market_value,
-        holdings: holdingsOut,
-      },
-      { headers: { "cache-control": "no-store" } }
-    );
+    // Determine quote_as_of as the most recent date we have across tickers
+    const quoteDates = rows
+      .map((r) => prices[r.ticker]?.date)
+      .filter((d): d is string => typeof d === "string" && d.length > 0)
+      .sort();
+    const quote_as_of_date = quoteDates.length ? quoteDates[quoteDates.length - 1] : null;
+
+    return NextResponse.json({
+      last_updated: now.toISOString(),
+      quote_as_of: quote_as_of_date ? new Date(`${quote_as_of_date}T21:00:00Z`).toISOString() : null, // approx EOD
+      total_market_value,
+      holdings: rows,
+    });
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message ?? "Unknown error in /api/portfolio" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }
 }

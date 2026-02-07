@@ -1,80 +1,89 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
-type HoldingRow = {
+type Holding = {
   ticker: string;
-  name?: string | null;
+  name?: string;
   shares: number;
-  cost_basis?: number | null; // total cost basis dollars (not per share)
-  last_price?: number | null; // EOD close
-  market_value?: number | null;
-  weight?: number | null;
+  last_price?: number;
+  market_value?: number;
+  weight?: number;
+  cost_basis?: number;
 };
 
-type PortfolioSnapshot = {
-  last_updated: string | null;
-  quote_as_of: string | null;
-  total_market_value: number;
-  holdings: HoldingRow[];
+type PortfolioResponse = {
+  last_updated?: string;
+  quote_as_of?: string;
+  total_market_value?: number;
+  holdings?: Holding[];
+  error?: string;
 };
-
-function fmtUsd(n: number | null | undefined) {
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
-  return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
-}
-
-function fmtNum(n: number | null | undefined, digits = 2) {
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
-  return n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
-}
-
-function fmtPct(n: number | null | undefined) {
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
-  return `${(n * 100).toFixed(2)}%`;
-}
 
 export default function PortfolioPage() {
-  const [data, setData] = useState<PortfolioSnapshot | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [data, setData] = useState<PortfolioResponse | null>(null);
 
   useEffect(() => {
-    let alive = true;
+    let cancelled = false;
 
-    async function load() {
-      setLoading(true);
-      setErr(null);
+    async function run() {
       try {
-        const res = await fetch("/api/portfolio", { cache: "no-store" });
-        const text = await res.text();
+        setLoading(true);
+        setErrMsg(null);
 
-        if (!res.ok) {
-          // Try to display JSON error if possible
-          try {
-            const j = JSON.parse(text);
-            throw new Error(j?.error || `HTTP ${res.status}`);
-          } catch {
-            throw new Error(text || `HTTP ${res.status}`);
-          }
+        const res = await fetch("/api/portfolio", { cache: "no-store" });
+
+        // Try to read JSON even on errors (your API returns { error: ... })
+        let payload: any = null;
+        try {
+          payload = await res.json();
+        } catch {
+          // If it isn't JSON, fall back to text
+          const txt = await res.text();
+          payload = { error: txt || `HTTP ${res.status}` };
         }
 
-        const j = JSON.parse(text) as PortfolioSnapshot;
-        if (alive) setData(j);
+        if (!res.ok) {
+          const apiErr =
+            typeof payload?.error === "string"
+              ? payload.error
+              : `HTTP ${res.status}`;
+          throw new Error(apiErr);
+        }
+
+        if (!cancelled) {
+          setData(payload as PortfolioResponse);
+        }
       } catch (e: any) {
-        if (alive) setErr(e?.message || String(e));
+        if (!cancelled) {
+          setData(null);
+          setErrMsg(e?.message ? String(e.message) : "Failed to load portfolio.");
+        }
       } finally {
-        if (alive) setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
-    load();
+    run();
     return () => {
-      alive = false;
+      cancelled = true;
     };
   }, []);
 
-  const rows = useMemo(() => data?.holdings ?? [], [data]);
+  const holdings: Holding[] = useMemo(() => {
+    const h = data?.holdings;
+    return Array.isArray(h) ? h : [];
+  }, [data]);
+
+  const lastUpdated = data?.last_updated || data?.quote_as_of || "";
+
+  const totalMarketValue = useMemo(() => {
+    if (typeof data?.total_market_value === "number") return data.total_market_value;
+    // fallback: sum
+    return holdings.reduce((sum, x) => sum + (Number(x.market_value) || 0), 0);
+  }, [data, holdings]);
 
   return (
     <main style={{ padding: 24 }}>
@@ -82,74 +91,58 @@ export default function PortfolioPage() {
 
       {loading && <p style={{ marginTop: 16 }}>Loading…</p>}
 
-      {err && (
-        <div style={{ marginTop: 16 }}>
-          <div style={{ color: "crimson", fontWeight: 700 }}>Failed to load portfolio.</div>
-          <pre style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>{err}</pre>
+      {!loading && errMsg && (
+        <div style={{ marginTop: 16, color: "crimson" }}>
+          <div style={{ fontWeight: 600 }}>Failed to load portfolio.</div>
+          <pre style={{ whiteSpace: "pre-wrap" }}>{errMsg}</pre>
         </div>
       )}
 
-      {!loading && !err && data && (
+      {!loading && !errMsg && (
         <>
-          <div style={{ marginTop: 20, lineHeight: 1.7 }}>
+          <div style={{ marginTop: 16 }}>
             <div>
-              <strong>Last updated:</strong>{" "}
-              {data.last_updated ? new Date(data.last_updated).toISOString() : "—"}
+              Last updated:{" "}
+              <b>{lastUpdated ? lastUpdated : "—"}</b>
             </div>
-            <div>
-              <strong>Prices as of (EOD close):</strong>{" "}
-              {data.quote_as_of ? new Date(data.quote_as_of).toISOString() : "—"}
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <strong>Total market value:</strong> {fmtUsd(data.total_market_value)}
+            <div style={{ marginTop: 8 }}>
+              Total market value: <b>{formatMoney(totalMarketValue)}</b>
             </div>
           </div>
 
-          <div style={{ marginTop: 22, overflowX: "auto" }}>
+          <div style={{ marginTop: 24, overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr>
-                  {["Ticker", "Name", "Shares", "Cost Basis", "Last Price (EOD)", "Market Value", "Weight"].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        style={{
-                          textAlign: "left",
-                          padding: "10px 8px",
-                          borderBottom: "2px solid #ddd",
-                          fontSize: 14,
-                        }}
-                      >
-                        {h}
-                      </th>
-                    )
-                  )}
+                <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
+                  <th style={th}>Ticker</th>
+                  <th style={th}>Name</th>
+                  <th style={thRight}>Shares</th>
+                  <th style={thRight}>Last Price</th>
+                  <th style={thRight}>Market Value</th>
+                  <th style={thRight}>Weight</th>
+                  <th style={thRight}>Cost Basis</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
-                  <tr key={r.ticker}>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #eee" }}>{r.ticker}</td>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #eee" }}>
-                      {r.name ?? "—"}
-                    </td>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #eee" }}>
-                      {fmtNum(r.shares, 0)}
-                    </td>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #eee" }}>
-                      {fmtUsd(r.cost_basis ?? null)}
-                    </td>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #eee" }}>
-                      {fmtUsd(r.last_price ?? null)}
-                    </td>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #eee" }}>
-                      {fmtUsd(r.market_value ?? null)}
-                    </td>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #eee" }}>
-                      {fmtPct(r.weight ?? null)}
+                {holdings.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: 12 }}>
+                      No holdings found.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  holdings.map((h, idx) => (
+                    <tr key={`${h.ticker}-${idx}`} style={{ borderBottom: "1px solid #eee" }}>
+                      <td style={td}>{h.ticker}</td>
+                      <td style={td}>{h.name ?? ""}</td>
+                      <td style={tdRight}>{formatNumber(h.shares)}</td>
+                      <td style={tdRight}>{formatMoney(h.last_price ?? 0)}</td>
+                      <td style={tdRight}>{formatMoney(h.market_value ?? 0)}</td>
+                      <td style={tdRight}>{formatPct(h.weight)}</td>
+                      <td style={tdRight}>{formatMoney(h.cost_basis ?? 0)}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -157,4 +150,26 @@ export default function PortfolioPage() {
       )}
     </main>
   );
+}
+
+const th: React.CSSProperties = { padding: 10, fontWeight: 700 };
+const thRight: React.CSSProperties = { ...th, textAlign: "right" };
+const td: React.CSSProperties = { padding: 10 };
+const tdRight: React.CSSProperties = { ...td, textAlign: "right" };
+
+function formatMoney(n: number) {
+  const v = Number.isFinite(n) ? n : 0;
+  return v.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
+
+function formatNumber(n: number) {
+  const v = Number.isFinite(n) ? n : 0;
+  return v.toLocaleString();
+}
+
+function formatPct(p?: number) {
+  const v = typeof p === "number" && Number.isFinite(p) ? p : 0;
+  // assume weight is 0-1; if already 0-100 this will look off but still safe
+  const asPct = v <= 1 ? v * 100 : v;
+  return `${asPct.toFixed(2)}%`;
 }

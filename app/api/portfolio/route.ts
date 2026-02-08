@@ -19,7 +19,14 @@ function normalizeTicker(raw: string) {
  */
 async function fetchDelayedQuotes(tickers: string[]): Promise<Quote[]> {
   const apiKey = process.env.API_NINJAS_KEY;
-  if (!apiKey) throw new Error("Missing API_NINJAS_KEY (set in Vercel Environment Variables)");
+
+  // Runtime guard + compile-time narrowing
+  if (!apiKey || apiKey.trim().length === 0) {
+    throw new Error("Missing API_NINJAS_KEY (set it in Vercel → Settings → Environment Variables)");
+  }
+
+  // IMPORTANT: make the header value a definite string for TS
+  const headers: HeadersInit = { "X-Api-Key": apiKey };
 
   const CONCURRENCY = 5;
   const queue = [...tickers];
@@ -32,7 +39,7 @@ async function fetchDelayedQuotes(tickers: string[]): Promise<Quote[]> {
 
       const url = `https://api.api-ninjas.com/v1/stockprice?ticker=${encodeURIComponent(t)}`;
       const res = await fetch(url, {
-        headers: { "X-Api-Key": apiKey },
+        headers,
         cache: "no-store",
       });
 

@@ -1,89 +1,92 @@
-// app/portfolio/page.tsx
-
 import { Suspense } from "react";
 import { headers } from "next/headers";
 
-type Position = {
+type Row = {
   ticker: string;
+  name: string;
   shares: number;
-  price?: number;
-  marketValue?: number;
-  weight?: number;
+  costBasis: number | null;
+  price: number | null;
+  marketValue: number | null;
+  weight: number | null;
+};
+
+type ApiPayload = {
+  last_updated?: string;
+  quote_source?: string;
+  totalMarketValue: number;
+  positions: Row[];
+  missing?: string[];
+  error?: string;
 };
 
 function getBaseUrlFromHeaders() {
   const h = headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "https";
-
-  if (!host) {
-    // Extremely rare, but prevents hard crash
-    return "http://localhost:3000";
-  }
-
-  return `${proto}://${host}`;
+  return host ? `${proto}://${host}` : "http://localhost:3000";
 }
 
-async function getPortfolio(): Promise<Position[]> {
+async function getPortfolio(): Promise<ApiPayload> {
   const baseUrl = getBaseUrlFromHeaders();
+  const res = await fetch(`${baseUrl}/api/portfolio`, { cache: "no-store" });
+  const text = await res.text();
+  if (!res.ok) throw new Error(text);
+  return JSON.parse(text);
+}
 
-  const res = await fetch(`${baseUrl}/api/portfolio`, {
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    // Surface something helpful in logs
-    const text = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch portfolio: ${res.status} ${text}`);
-  }
-
-  const data = await res.json();
-  return data.positions ?? [];
+function money(x: number) {
+  return x.toLocaleString(undefined, { style: "currency", currency: "USD" });
 }
 
 async function PortfolioTable() {
-  const positions = await getPortfolio();
-
-  const totalValue = positions.reduce((sum, p) => sum + (p.marketValue ?? 0), 0);
+  const data = await getPortfolio();
 
   return (
     <div style={{ padding: "2rem" }}>
       <h1>Portfolio</h1>
 
+      {data.missing?.length ? (
+        <div style={{ marginTop: 8, fontSize: 12, color: "#666" }}>
+          Missing quotes: {data.missing.join(", ")}
+        </div>
+      ) : null}
+
       <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "1rem" }}>
         <thead>
           <tr>
             <th align="left">Ticker</th>
+            <th align="left">Firm</th>
             <th align="right">Shares</th>
+            <th align="right">Cost Basis</th>
             <th align="right">Price</th>
             <th align="right">Market Value</th>
             <th align="right">Weight</th>
           </tr>
         </thead>
         <tbody>
-          {positions.map((p) => (
+          {data.positions.map((p) => (
             <tr key={p.ticker}>
               <td>{p.ticker}</td>
+              <td>{p.name || "—"}</td>
               <td align="right">{p.shares}</td>
+              <td align="right">{p.costBasis === null ? "Incomplete" : money(p.costBasis)}</td>
+              <td align="right">{p.price === null ? "—" : money(p.price)}</td>
+              <td align="right">{p.marketValue === null ? "—" : money(p.marketValue)}</td>
               <td align="right">
-                {typeof p.price === "number" ? `$${p.price.toFixed(2)}` : "—"}
-              </td>
-              <td align="right">
-                {typeof p.marketValue === "number"
-                  ? `$${p.marketValue.toLocaleString()}`
-                  : "—"}
-              </td>
-              <td align="right">
-                {typeof p.weight === "number" ? `${(p.weight * 100).toFixed(2)}%` : "—"}
+                {p.weight === null ? "—" : `${(p.weight * 100).toFixed(2)}%`}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <h2 style={{ marginTop: "1.5rem" }}>
-        Total Market Value: ${totalValue.toLocaleString()}
-      </h2>
+      <h2 style={{ marginTop: "1.5rem" }}>Total Market Value: {money(data.totalMarketValue)}</h2>
+
+      <div style={{ marginTop: 8, fontSize: 12, color: "#666" }}>
+        Last updated: {data.last_updated ?? "—"}
+        {data.quote_source ? ` | Source: ${data.quote_source}` : ""}
+      </div>
     </div>
   );
 }

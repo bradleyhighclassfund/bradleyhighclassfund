@@ -1,522 +1,67 @@
 {
-  "last_updated": "2026-02-02",
-  "source": "Individual-Positions-2026-02-02-205634.csv",
+  "as_of": "2026-02-02T20:56:34Z",
+  "cash": 3757.35,
   "holdings": [
-    {
-      "ticker": "ABT",
-      "name": "ABBOTT LABS",
-      "shares": 10,
-      "cost_basis": 959.25
-    },
-    {
-      "ticker": "ACCO",
-      "name": "ACCO BRANDS CORP",
-      "shares": 4,
-      "cost_basis": null
-    },
-    {
-      "ticker": "ADBE",
-      "name": "ADOBE INC",
-      "shares": 3,
-      "cost_basis": 1120.11
-    },
-    {
-      "ticker": "AMCR",
-      "name": "AMCOR PLC F",
-      "shares": 50,
-      "cost_basis": 1804.34
-    },
-    {
-      "ticker": "AMD",
-      "name": "ADVANCED MICRO DEVIC",
-      "shares": 35,
-      "cost_basis": 929.36
-    },
-    {
-      "ticker": "AMT",
-      "name": "AMERICAN TOWER CORP NEW REIT",
-      "shares": 7,
-      "cost_basis": 1848.91
-    },
-    {
-      "ticker": "AMZN",
-      "name": "AMAZON.COM INC",
-      "shares": 20,
-      "cost_basis": 940.25
-    },
-    {
-      "ticker": "AXON",
-      "name": "AXON ENTERPRISE INC",
-      "shares": 6,
-      "cost_basis": 1792.86
-    },
-    {
-      "ticker": "BAH",
-      "name": "BOOZ ALLEN HAMILTON HLDGCLASS CLASS A",
-      "shares": 14,
-      "cost_basis": 998.16
-    },
-    {
-      "ticker": "BBY",
-      "name": "BEST BUY INC",
-      "shares": 34,
-      "cost_basis": null
-    },
-    {
-      "ticker": "BKR",
-      "name": "BAKER HUGHES CO. A CLASS CLASS A",
-      "shares": 15,
-      "cost_basis": 961.73
-    },
-    {
-      "ticker": "CL",
-      "name": "COLGATE PALMOLIVE CO",
-      "shares": 12,
-      "cost_basis": 877.91
-    },
-    {
-      "ticker": "CLH",
-      "name": "CLEAN HBRS INC",
-      "shares": 10,
-      "cost_basis": 1942.5
-    },
-    {
-      "ticker": "CMI",
-      "name": "CUMMINS INC",
-      "shares": 3,
-      "cost_basis": 713.88
-    },
-    {
-      "ticker": "COST",
-      "name": "COSTCO WHOLESALE CORP",
-      "shares": 2,
-      "cost_basis": 1086.66
-    },
-    {
-      "ticker": "CPRT",
-      "name": "COPART INC",
-      "shares": 26,
-      "cost_basis": 1226.22
-    },
-    {
-      "ticker": "CSX",
-      "name": "CSX CORP",
-      "shares": 35,
-      "cost_basis": 1350.16
-    },
-    {
-      "ticker": "CTVA",
-      "name": "CORTEVA INC",
-      "shares": 9,
-      "cost_basis": 513.45
-    },
-    {
-      "ticker": "CVS",
-      "name": "CVS HEALTH CORP",
-      "shares": 20,
-      "cost_basis": 1537.72
-    },
-    {
-      "ticker": "CVX",
-      "name": "CHEVRON CORP",
-      "shares": 5,
-      "cost_basis": 779.74
-    },
-    {
-      "ticker": "DD",
-      "name": "DUPONT DE NEMOURS INC",
-      "shares": 10,
-      "cost_basis": 737.52
-    },
-    {
-      "ticker": "DE",
-      "name": "DEERE & CO",
-      "shares": 3,
-      "cost_basis": 1060.17
-    },
-    {
-      "ticker": "DG",
-      "name": "DOLLAR GENERAL CORP",
-      "shares": 4,
-      "cost_basis": 1080.65
-    },
-    {
-      "ticker": "DOV",
-      "name": "DOVER CORP",
-      "shares": 12,
-      "cost_basis": 1648.42
-    },
-    {
-      "ticker": "DRI",
-      "name": "DARDEN RESTAURANTS INC",
-      "shares": 8,
-      "cost_basis": 1045.35
-    },
-    {
-      "ticker": "ECL",
-      "name": "ECOLAB INC",
-      "shares": 6,
-      "cost_basis": 915.29
-    },
-    {
-      "ticker": "EBAY",
-      "name": "EBAY INC",
-      "shares": 12,
-      "cost_basis": 626.72
-    },
-    {
-      "ticker": "ENB",
-      "name": "ENBRIDGE INC",
-      "shares": 30,
-      "cost_basis": 1179.32
-    },
-    {
-      "ticker": "FBIN",
-      "name": "FORTUNE BRANDS INNOVATIONS INC",
-      "shares": 5,
-      "cost_basis": 348.91
-    },
-    {
-      "ticker": "FDX",
-      "name": "FEDEX CORP",
-      "shares": 6,
-      "cost_basis": 1491.27
-    },
-    {
-      "ticker": "FIS",
-      "name": "FIDELITY NATIONAL INFO SERV",
-      "shares": 30,
-      "cost_basis": 1381.57
-    },
-    {
-      "ticker": "FLS",
-      "name": "FLOWSERVE CORP",
-      "shares": 70,
-      "cost_basis": 2797.11
-    },
-    {
-      "ticker": "FUTU",
-      "name": "FUTU HOLDINGS LTD ADR",
-      "shares": 12,
-      "cost_basis": 761.95
-    },
-    {
-      "ticker": "GDDY",
-      "name": "GODADDY INC CLASS CLASS A",
-      "shares": 6,
-      "cost_basis": 764.09
-    },
-    {
-      "ticker": "GDOT",
-      "name": "GREEN DOT CORP",
-      "shares": 40,
-      "cost_basis": 3356.0
-    },
-    {
-      "ticker": "GE",
-      "name": "GENERAL ELECTRIC CO",
-      "shares": 4,
-      "cost_basis": 647.41
-    },
-    {
-      "ticker": "GEHC",
-      "name": "GE HEALTHCARE TECHNOLOGIES INC",
-      "shares": 1,
-      "cost_basis": 82.17
-    },
-    {
-      "ticker": "GIS",
-      "name": "GENERAL MILLS INC",
-      "shares": 25,
-      "cost_basis": 1391.84
-    },
-    {
-      "ticker": "GLD",
-      "name": "SPDR GOLD TR GOLD SHS",
-      "shares": 10,
-      "cost_basis": 1840.76
-    },
-    {
-      "ticker": "GM",
-      "name": "GENERAL MOTORS CO",
-      "shares": 30,
-      "cost_basis": 1759.28
-    },
-    {
-      "ticker": "GPN",
-      "name": "GLOBAL PAYMENTS INC",
-      "shares": 7,
-      "cost_basis": 914.33
-    },
-    {
-      "ticker": "GRMN",
-      "name": "GARMIN LTD",
-      "shares": 6,
-      "cost_basis": 892.86
-    },
-    {
-      "ticker": "GS",
-      "name": "GOLDMAN SACHS GROUP INC",
-      "shares": 3,
-      "cost_basis": 1000.31
-    },
-    {
-      "ticker": "HBI",
-      "name": "HANESBRANDS INC",
-      "shares": 90,
-      "cost_basis": 968.7
-    },
-    {
-      "ticker": "HD",
-      "name": "HOME DEPOT INC",
-      "shares": 2,
-      "cost_basis": 637.73
-    },
-    {
-      "ticker": "HOG",
-      "name": "HARLEY DAVIDSON INC",
-      "shares": 100,
-      "cost_basis": 2834.11
-    },
-    {
-      "ticker": "HON",
-      "name": "HONEYWELL INTL INC",
-      "shares": 5,
-      "cost_basis": 1093.12
-    },
-    {
-      "ticker": "HUBS",
-      "name": "HUBSPOT INC",
-      "shares": 2,
-      "cost_basis": 1072.29
-    },
-    {
-      "ticker": "HUM",
-      "name": "HUMANA INC",
-      "shares": 3,
-      "cost_basis": 998.94
-    },
-    {
-      "ticker": "INTC",
-      "name": "INTEL CORP",
-      "shares": 12,
-      "cost_basis": 583.14
-    },
-    {
-      "ticker": "ISRG",
-      "name": "INTUITIVE SURGICAL INC",
-      "shares": 2,
-      "cost_basis": 668.02
-    },
-    {
-      "ticker": "JNJ",
-      "name": "JOHNSON & JOHNSON",
-      "shares": 8,
-      "cost_basis": 1219.45
-    },
-    {
-      "ticker": "JPM",
-      "name": "JPMORGAN CHASE & CO",
-      "shares": 6,
-      "cost_basis": 1097.44
-    },
-    {
-      "ticker": "KMB",
-      "name": "KIMBERLY CLARK CORP",
-      "shares": 6,
-      "cost_basis": 812.7
-    },
-    {
-      "ticker": "KO",
-      "name": "COCA COLA CO",
-      "shares": 15,
-      "cost_basis": 889.61
-    },
-    {
-      "ticker": "LMT",
-      "name": "LOCKHEED MARTIN CORP",
-      "shares": 2,
-      "cost_basis": 959.32
-    },
-    {
-      "ticker": "MA",
-      "name": "MASTERCARD INC CLASS CLASS A",
-      "shares": 4,
-      "cost_basis": 1700.72
-    },
-    {
-      "ticker": "MCD",
-      "name": "MCDONALDS CORP",
-      "shares": 6,
-      "cost_basis": 1689.1
-    },
-    {
-      "ticker": "MGM",
-      "name": "MGM RESORTS INTERNATIONAL",
-      "shares": 25,
-      "cost_basis": 996.58
-    },
-    {
-      "ticker": "MMM",
-      "name": "3M CO",
-      "shares": 50,
-      "cost_basis": 4411.54
-    },
-    {
-      "ticker": "MP",
-      "name": "MP MATERIALS CORP CLASS CLASS A",
-      "shares": 80,
-      "cost_basis": 661.35
-    },
-    {
-      "ticker": "MRK",
-      "name": "MERCK & CO INC",
-      "shares": 7,
-      "cost_basis": 966.64
-    },
-    {
-      "ticker": "MSFT",
-      "name": "MICROSOFT CORP",
-      "shares": 12,
-      "cost_basis": 1647.76
-    },
-    {
-      "ticker": "NEE",
-      "name": "NEXTERA ENERGY INC",
-      "shares": 40,
-      "cost_basis": 2292.08
-    },
-    {
-      "ticker": "NVDA",
-      "name": "NVIDIA CORP",
-      "shares": 200,
-      "cost_basis": 918.42
-    },
-    {
-      "ticker": "OC",
-      "name": "OWENS CORNING",
-      "shares": 60,
-      "cost_basis": 1964.49
-    },
-    {
-      "ticker": "OGN",
-      "name": "ORGANON & CO",
-      "shares": 100,
-      "cost_basis": 228.27
-    },
-    {
-      "ticker": "ORCL",
-      "name": "ORACLE CORP",
-      "shares": 5,
-      "cost_basis": 595.41
-    },
-    {
-      "ticker": "PG",
-      "name": "PROCTER & GAMBLE CO",
-      "shares": 12,
-      "cost_basis": 1768.33
-    },
-    {
-      "ticker": "PYPL",
-      "name": "PAYPAL HOLDINGS INC",
-      "shares": 8,
-      "cost_basis": 787.14
-    },
-    {
-      "ticker": "QCOM",
-      "name": "QUALCOMM INC",
-      "shares": 7,
-      "cost_basis": 1006.59
-    },
-    {
-      "ticker": "SBUX",
-      "name": "STARBUCKS CORP",
-      "shares": 12,
-      "cost_basis": 1199.29
-    },
-    {
-      "ticker": "SCHW",
-      "name": "CHARLES SCHWAB CORP",
-      "shares": 12,
-      "cost_basis": 1277.69
-    },
-    {
-      "ticker": "SPOT",
-      "name": "SPOTIFY TECHNOLOGY SA",
-      "shares": 3,
-      "cost_basis": 508.21
-    },
-    {
-      "ticker": "T",
-      "name": "AT&T INC",
-      "shares": 65,
-      "cost_basis": 1593.61
-    },
-    {
-      "ticker": "TGT",
-      "name": "TARGET CORP",
-      "shares": 10,
-      "cost_basis": 1301.62
-    },
-    {
-      "ticker": "TSLA",
-      "name": "TESLA INC",
-      "shares": 45,
-      "cost_basis": 1078.14
-    },
-    {
-      "ticker": "TSN",
-      "name": "TYSON FOODS INC CLASS CLASS A",
-      "shares": 20,
-      "cost_basis": 921.78
-    },
-    {
-      "ticker": "UAA",
-      "name": "UNDER ARMOUR INC CLASS CLASS A",
-      "shares": 116,
-      "cost_basis": 501.62
-    },
-    {
-      "ticker": "ULTA",
-      "name": "ULTA BEAUTY INC",
-      "shares": 4,
-      "cost_basis": 1003.17
-    },
-    {
-      "ticker": "UPS",
-      "name": "UNITED PARCEL SVC INC CLASS CLASS B",
-      "shares": 16,
-      "cost_basis": null
-    },
-    {
-      "ticker": "VLTO",
-      "name": "VERALTO CORP",
-      "shares": 1,
-      "cost_basis": 78.05
-    },
-    {
-      "ticker": "WFC",
-      "name": "WELLS FARGO & CO",
-      "shares": 20,
-      "cost_basis": 985.99
-    },
-    {
-      "ticker": "WM",
-      "name": "WASTE MGMT INC DEL",
-      "shares": 14,
-      "cost_basis": 1029.58
-    },
-    {
-      "ticker": "WMT",
-      "name": "WALMART INC",
-      "shares": 51,
-      "cost_basis": null
-    },
-    {
-      "ticker": "XYZ",
-      "name": "BLOCK INC A CLASS CLASS A",
-      "shares": 10,
-      "cost_basis": 936.09
-    }
+    { "ticker": "ABT", "name": "ABBOTT LABS", "shares": 10, "cost_basis": 959.25 },
+    { "ticker": "ACCO", "name": "ACCO BRANDS CORP", "shares": 4, "cost_basis": null },
+    { "ticker": "ADBE", "name": "ADOBE INC", "shares": 3, "cost_basis": 1589.22 },
+    { "ticker": "AMCR", "name": "AMCOR PLC", "shares": 50, "cost_basis": 540.95 },
+    { "ticker": "AMD", "name": "ADVANCED MICRO DEVICES", "shares": 35, "cost_basis": 5323.36 },
+    { "ticker": "AMT", "name": "AMERICAN TOWER CORP", "shares": 7, "cost_basis": 1644.37 },
+    { "ticker": "AMZN", "name": "AMAZON.COM INC", "shares": 20, "cost_basis": 3315.52 },
+    { "ticker": "AXON", "name": "AXON ENTERPRISE INC", "shares": 6, "cost_basis": 1626.33 },
+    { "ticker": "BAH", "name": "BOOZ ALLEN HAMILTON HLDG", "shares": 14, "cost_basis": 2196.56 },
+    { "ticker": "BBY", "name": "BEST BUY CO INC", "shares": 34, "cost_basis": 2813.9 },
+    { "ticker": "BKR", "name": "BAKER HUGHES CO", "shares": 15, "cost_basis": 499.79 },
+    { "ticker": "CL", "name": "COLGATE-PALMOLIVE CO", "shares": 12, "cost_basis": 1040.36 },
+    { "ticker": "CRM", "name": "SALESFORCE INC", "shares": 4, "cost_basis": 1117.4 },
+    { "ticker": "CSCO", "name": "CISCO SYSTEMS INC", "shares": 20, "cost_basis": 945.21 },
+    { "ticker": "CVX", "name": "CHEVRON CORP", "shares": 5, "cost_basis": 773.98 },
+    { "ticker": "DE", "name": "DEERE & CO", "shares": 3, "cost_basis": 1293.54 },
+    { "ticker": "DG", "name": "DOLLAR GENERAL CORP", "shares": 4, "cost_basis": 561.82 },
+    { "ticker": "DHR", "name": "DANAHER CORP", "shares": 8, "cost_basis": 1643.31 },
+    { "ticker": "DIS", "name": "WALT DISNEY CO", "shares": 18, "cost_basis": 1585.36 },
+    { "ticker": "DLTR", "name": "DOLLAR TREE INC", "shares": 6, "cost_basis": 834.51 },
+    { "ticker": "DUK", "name": "DUKE ENERGY CORP", "shares": 10, "cost_basis": 976.24 },
+    { "ticker": "EMR", "name": "EMERSON ELECTRIC CO", "shares": 7, "cost_basis": 718.63 },
+    { "ticker": "ETN", "name": "EATON CORP PLC", "shares": 6, "cost_basis": 1616.56 },
+    { "ticker": "F", "name": "FORD MOTOR CO", "shares": 80, "cost_basis": 1037.74 },
+    { "ticker": "FANG", "name": "DIAMONDBACK ENERGY INC", "shares": 5, "cost_basis": 750.35 },
+    { "ticker": "FDX", "name": "FEDEX CORP", "shares": 2, "cost_basis": 534.47 },
+    { "ticker": "GILD", "name": "GILEAD SCIENCES INC", "shares": 15, "cost_basis": 1154.78 },
+    { "ticker": "GOOG", "name": "ALPHABET INC CL C", "shares": 8, "cost_basis": 1199.78 },
+    { "ticker": "GS", "name": "GOLDMAN SACHS GROUP INC", "shares": 2, "cost_basis": 785.21 },
+    { "ticker": "HD", "name": "HOME DEPOT INC", "shares": 4, "cost_basis": 1338.54 },
+    { "ticker": "HON", "name": "HONEYWELL INTERNATIONAL INC", "shares": 6, "cost_basis": 1242.84 },
+    { "ticker": "IBM", "name": "INTERNATIONAL BUSINESS MACHINES", "shares": 8, "cost_basis": 1326.6 },
+    { "ticker": "INTU", "name": "INTUIT INC", "shares": 2, "cost_basis": 1141.4 },
+    { "ticker": "JNJ", "name": "JOHNSON & JOHNSON", "shares": 10, "cost_basis": 1679.15 },
+    { "ticker": "JPM", "name": "JPMORGAN CHASE & CO", "shares": 6, "cost_basis": 1029.66 },
+    { "ticker": "KO", "name": "COCA-COLA CO", "shares": 14, "cost_basis": 854.88 },
+    { "ticker": "LIN", "name": "LINDE PLC", "shares": 4, "cost_basis": 1700.75 },
+    { "ticker": "LLY", "name": "ELI LILLY & CO", "shares": 2, "cost_basis": 1342.82 },
+    { "ticker": "LOW", "name": "LOWE'S COS INC", "shares": 6, "cost_basis": 1384.8 },
+    { "ticker": "MA", "name": "MASTERCARD INC", "shares": 3, "cost_basis": 1417.25 },
+    { "ticker": "MCD", "name": "MCDONALD'S CORP", "shares": 4, "cost_basis": 1255.22 },
+    { "ticker": "MDT", "name": "MEDTRONIC PLC", "shares": 16, "cost_basis": 1381.27 },
+    { "ticker": "META", "name": "META PLATFORMS INC", "shares": 2, "cost_basis": 710.56 },
+    { "ticker": "MRK", "name": "MERCK & CO INC", "shares": 15, "cost_basis": 1606.75 },
+    { "ticker": "MSFT", "name": "MICROSOFT CORP", "shares": 6, "cost_basis": 2401.56 },
+    { "ticker": "NEE", "name": "NEXTERA ENERGY INC", "shares": 20, "cost_basis": 1249.22 },
+    { "ticker": "NFLX", "name": "NETFLIX INC", "shares": 1, "cost_basis": 502.15 },
+    { "ticker": "NKE", "name": "NIKE INC CL B", "shares": 12, "cost_basis": 1246.41 },
+    { "ticker": "NVDA", "name": "NVIDIA CORP", "shares": 200, "cost_basis": 20604.53 },
+    { "ticker": "ORCL", "name": "ORACLE CORP", "shares": 10, "cost_basis": 1285.7 },
+    { "ticker": "PEP", "name": "PEPSICO INC", "shares": 6, "cost_basis": 1041.11 },
+    { "ticker": "PG", "name": "PROCTER & GAMBLE CO", "shares": 8, "cost_basis": 1327.88 },
+    { "ticker": "PGR", "name": "PROGRESSIVE CORP", "shares": 6, "cost_basis": 1061.33 },
+    { "ticker": "RTX", "name": "RTX CORP", "shares": 12, "cost_basis": 1065.02 },
+    { "ticker": "SBUX", "name": "STARBUCKS CORP", "shares": 12, "cost_basis": 1178.04 },
+    { "ticker": "TMO", "name": "THERMO FISHER SCIENTIFIC INC", "shares": 2, "cost_basis": 1050.22 },
+    { "ticker": "TSLA", "name": "TESLA INC", "shares": 4, "cost_basis": 913.06 },
+    { "ticker": "UNH", "name": "UNITEDHEALTH GROUP INC", "shares": 2, "cost_basis": 1068.18 },
+    { "ticker": "V", "name": "VISA INC", "shares": 6, "cost_basis": 1630.9 },
+    { "ticker": "WMT", "name": "WALMART INC", "shares": 10, "cost_basis": 1708.22 },
+    { "ticker": "XOM", "name": "EXXON MOBIL CORP", "shares": 8, "cost_basis": 901.77 }
   ]
 }

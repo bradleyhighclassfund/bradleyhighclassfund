@@ -1,94 +1,124 @@
 import { NextResponse } from "next/server";
-import fs from "fs/promises";
+import fs from "fs";
 import path from "path";
 
-type RawHolding =
-  | {
-      ticker?: string;
-      symbol?: string;
-      shares?: number | string;
-      quantity?: number | string;
-      name?: string;
-      firm?: string;
-      cost_basis?: number | string;
-      costBasis?: number | string;
-    }
-  | any;
+type Holding = { ticker: string; shares: number };
 
-function toNumber(v: unknown): number {
-  if (v === null || v === undefined) return 0;
-  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
-  const n = Number(String(v).replace(/[$,]/g, "").trim());
-  return Number.isFinite(n) ? n : 0;
-}
-
-function normalizeHoldings(json: any): Array<{
-  ticker: string;
-  name: string;
-  shares: number;
-  cost_basis: number;
-}> {
-  const raw: RawHolding[] = Array.isArray(json)
-    ? json
-    : Array.isArray(json?.holdings)
-      ? json.holdings
-      : Array.isArray(json?.positions)
-        ? json.positions
-        : [];
-
-  return raw
-    .map((h) => {
-      const t = String(h?.ticker ?? h?.symbol ?? "").trim().toUpperCase();
-      const name = String(h?.name ?? h?.firm ?? "").trim();
-      const shares = toNumber(h?.shares ?? h?.quantity);
-      const cost_basis = toNumber(h?.cost_basis ?? h?.costBasis);
-
-      return { ticker: t, name, shares, cost_basis };
-    })
-    .filter((h) => h.ticker && h.shares > 0);
-}
-
-async function readJsonFile(fileRelPath: string) {
-  const filePath = path.join(process.cwd(), fileRelPath);
-  const text = await fs.readFile(filePath, "utf-8");
-  return JSON.parse(text);
+function normalizeTicker(raw: string) {
+  return raw.trim().toUpperCase().replace(".", "-");
 }
 
 export async function GET() {
   try {
-    // IMPORTANT: this path is relative to the repo root
-    // Ensure the file exists at: /data/active_holdings.json
-    const json = await readJsonFile("data/active_holdings.json");
-    const holdings = normalizeHoldings(json);
+    const holdingsPath = path.join(process.cwd(), "data", "active_holdings.json");
 
-    // Prices are optional. If you later add EOD pricing, you can fill these in.
-    // For now we return 0s so the UI works reliably.
-    const enriched = holdings.map((h) => ({
-      ...h,
-      last_price: 0,
-      market_value: 0,
-      weight: 0,
+    if (!fs.existsSync(holdingsPath)) {
+      return NextResponse.json(
+        { error: "Missing data/active_holdings.json", last_updated: null, positions: [] },
+        { status: 500 }
+      );
+    }
+
+    const holdingsRaw = fs.readFileSync(holdingsPath, "utf-8");
+    const holdings: Holding[] = JSON.parse(holdingsRaw);
+
+    const cleaned = (holdings ?? [])
+      .filter(h => h && typeof h.ticker === "string" && typeof h.shares === "number")
+      .map(h => ({ ticker: normalizeTicker(h.ticker), shares: h.shares }))
+      .filter(h => h.ticker.length > 0 && h.shares > 0);
+
+    if (cleaned.length === 0) {
+      return NextResponse.json(
+        {
+          last_updated: new Date().toISOString(),
+          positions: [],
+          missing: [],
+          note: "No holdings found (active_holdings.json is empty).",
+        },
+        { status: 200 }
+      );
+    }
+
+    const symbols = Array.from(new Set(cleaned.map(h => h.ticker))).slice(0, 100);
+
+    const url = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(
+      symbols.join(",")
+    )}`;
+
+    const resp = await fetch(url, {
+      // Cache the quote response for 5 minutes at the edge/server
+      next: { revalidate: 300 },
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        Accept: "application/json,text/plain,*/*",
+      },
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      return NextResponse.json(
+        {
+          error: `Quote fetch failed: ${resp.status}`,
+          detail: text.slice(0, 300),
+          last_updated: new Date().toISOString(),
+          positions: [],
+          missing: symbols,
+        },
+        { status: 200 }
+      );
+    }
+
+    const data = await resp.json();
+    const results: any[] = data?.quoteResponse?.result ?? [];
+
+    const priceMap: Record<string, number> = {};
+    for (const q of results) {
+      if (q?.symbol && typeof q?.regularMarketPrice === "number") {
+        priceMap[q.symbol] = q.regularMarketPrice;
+      }
+    }
+
+    const positions = cleaned.map(h => {
+      const price = priceMap[h.ticker];
+      const marketValue = typeof price === "number" ? price * h.shares : undefined;
+      return {
+        ticker: h.ticker,
+        shares: h.shares,
+        price,
+        marketValue,
+      };
+    });
+
+    const totalMarketValue = positions.reduce((sum, p) => sum + (p.marketValue ?? 0), 0);
+
+    const positionsWithWeights = positions.map(p => ({
+      ...p,
+      weight:
+        typeof p.marketValue === "number" && totalMarketValue > 0
+          ? p.marketValue / totalMarketValue
+          : undefined,
     }));
 
-    return NextResponse.json({
-      last_updated: new Date().toISOString(),
-      total_market_value: 0,
-      holdings: enriched, // <-- ALWAYS an array
-      error: null,
-    });
-  } catch (err: any) {
-    // <-- Even on error, ALWAYS return holdings: []
+    const missing = symbols.filter(s => priceMap[s] == null);
+
     return NextResponse.json(
       {
-        last_updated: null,
-        total_market_value: 0,
-        holdings: [],
-        error:
-          typeof err?.message === "string"
-            ? err.message
-            : "Unknown server error in /api/portfolio",
+        last_updated: new Date().toISOString(),
+        totalMarketValue,
+        positions: positionsWithWeights,
+        missing,
       },
-      { status: 200 } // keep 200 so the page can render the error gracefully
+      { status: 200 }
+    );
+  } catch (e: any) {
+    return NextResponse.json(
+      {
+        error: "Server error computing portfolio",
+        detail: e?.message ?? String(e),
+        last_updated: null,
+        positions: [],
+      },
+      { status: 500 }
     );
   }
 }

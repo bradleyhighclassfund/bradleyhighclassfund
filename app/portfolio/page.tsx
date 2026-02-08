@@ -1,6 +1,7 @@
 // app/portfolio/page.tsx
 
 import { Suspense } from "react";
+import { headers } from "next/headers";
 
 type Position = {
   ticker: string;
@@ -10,14 +11,30 @@ type Position = {
   weight?: number;
 };
 
+function getBaseUrlFromHeaders() {
+  const h = headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+
+  if (!host) {
+    // Extremely rare, but prevents hard crash
+    return "http://localhost:3000";
+  }
+
+  return `${proto}://${host}`;
+}
+
 async function getPortfolio(): Promise<Position[]> {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/portfolio`,
-    { cache: "no-store" }
-  );
+  const baseUrl = getBaseUrlFromHeaders();
+
+  const res = await fetch(`${baseUrl}/api/portfolio`, {
+    cache: "no-store",
+  });
 
   if (!res.ok) {
-    throw new Error("Failed to fetch portfolio");
+    // Surface something helpful in logs
+    const text = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch portfolio: ${res.status} ${text}`);
   }
 
   const data = await res.json();
@@ -27,18 +44,13 @@ async function getPortfolio(): Promise<Position[]> {
 async function PortfolioTable() {
   const positions = await getPortfolio();
 
-  const totalValue = positions.reduce(
-    (sum, p) => sum + (p.marketValue ?? 0),
-    0
-  );
+  const totalValue = positions.reduce((sum, p) => sum + (p.marketValue ?? 0), 0);
 
   return (
     <div style={{ padding: "2rem" }}>
       <h1>Portfolio</h1>
 
-      <table
-        style={{ width: "100%", borderCollapse: "collapse", marginTop: "1rem" }}
-      >
+      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "1rem" }}>
         <thead>
           <tr>
             <th align="left">Ticker</th>
@@ -49,14 +61,12 @@ async function PortfolioTable() {
           </tr>
         </thead>
         <tbody>
-          {positions.map(p => (
+          {positions.map((p) => (
             <tr key={p.ticker}>
               <td>{p.ticker}</td>
               <td align="right">{p.shares}</td>
               <td align="right">
-                {typeof p.price === "number"
-                  ? `$${p.price.toFixed(2)}`
-                  : "—"}
+                {typeof p.price === "number" ? `$${p.price.toFixed(2)}` : "—"}
               </td>
               <td align="right">
                 {typeof p.marketValue === "number"
@@ -64,9 +74,7 @@ async function PortfolioTable() {
                   : "—"}
               </td>
               <td align="right">
-                {typeof p.weight === "number"
-                  ? `${(p.weight * 100).toFixed(2)}%`
-                  : "—"}
+                {typeof p.weight === "number" ? `${(p.weight * 100).toFixed(2)}%` : "—"}
               </td>
             </tr>
           ))}

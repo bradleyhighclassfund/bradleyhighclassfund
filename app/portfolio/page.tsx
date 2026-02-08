@@ -1,175 +1,113 @@
-"use client";
-
-import React, { useEffect, useMemo, useState } from "react";
+import { NextResponse } from "next/server";
+import { readFile } from "fs/promises";
+import path from "path";
 
 type Holding = {
   ticker: string;
   name?: string;
   shares: number;
-  last_price?: number;
-  market_value?: number;
-  weight?: number;
-  cost_basis?: number;
+  cost_basis?: number | null;
 };
 
-type PortfolioResponse = {
-  last_updated?: string;
-  quote_as_of?: string;
-  total_market_value?: number;
-  holdings?: Holding[];
-  error?: string;
-};
+type HoldingsFile =
+  | Holding[]
+  | { as_of?: string; cash?: number; holdings?: Holding[] };
 
-export default function PortfolioPage() {
-  const [loading, setLoading] = useState(true);
-  const [errMsg, setErrMsg] = useState<string | null>(null);
-  const [data, setData] = useState<PortfolioResponse | null>(null);
+function toArray(v: unknown): Holding[] {
+  if (Array.isArray(v)) return v as Holding[];
+  if (v && typeof v === "object" && Array.isArray((v as any).holdings)) return (v as any).holdings as Holding[];
+  return [];
+}
 
-  useEffect(() => {
-    let cancelled = false;
+// Stooq is free and gives end-of-day (typically prior close). No key needed.
+// Example: https://stooq.com/q/l/?s=aapl.us&f=sd2t2ohlcv&h&e=csv
+async function fetchEodCloseUSD(ticker: string): Promise<{ close: number | null; date: string | null }> {
+  // Stooq uses dash for class shares; keep simple normalization.
+  const sym = ticker.trim().toLowerCase().replace(/\./g, "-") + ".us";
+  const url = `https://stooq.com/q/l/?s=${encodeURIComponent(sym)}&f=sd2t2ohlcv&h&e=csv`;
 
-    async function run() {
-      try {
-        setLoading(true);
-        setErrMsg(null);
+  const res = await fetch(url, { next: { revalidate: 3600 } }); // refresh at most hourly
+  if (!res.ok) return { close: null, date: null };
 
-        const res = await fetch("/api/portfolio", { cache: "no-store" });
+  const txt = await res.text();
+  const lines = txt.trim().split(/\r?\n/);
+  if (lines.length < 2) return { close: null, date: null };
 
-        // Try to read JSON even on errors (your API returns { error: ... })
-        let payload: any = null;
-        try {
-          payload = await res.json();
-        } catch {
-          // If it isn't JSON, fall back to text
-          const txt = await res.text();
-          payload = { error: txt || `HTTP ${res.status}` };
-        }
+  const headers = lines[0].split(",");
+  const values = lines[1].split(",");
 
-        if (!res.ok) {
-          const apiErr =
-            typeof payload?.error === "string"
-              ? payload.error
-              : `HTTP ${res.status}`;
-          throw new Error(apiErr);
-        }
+  const idxClose = headers.findIndex((h) => h.toLowerCase() === "close");
+  const idxDate = headers.findIndex((h) => h.toLowerCase() === "date");
 
-        if (!cancelled) {
-          setData(payload as PortfolioResponse);
-        }
-      } catch (e: any) {
-        if (!cancelled) {
-          setData(null);
-          setErrMsg(e?.message ? String(e.message) : "Failed to load portfolio.");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const closeStr = idxClose >= 0 ? values[idxClose] : "";
+  const dateStr = idxDate >= 0 ? values[idxDate] : "";
+
+  const close = closeStr && closeStr !== "N/A" ? Number(closeStr) : null;
+  const date = dateStr && dateStr !== "N/A" ? dateStr : null;
+
+  return { close: Number.isFinite(close as any) ? (close as number) : null, date };
+}
+
+export async function GET() {
+  try {
+    const filePath = path.join(process.cwd(), "data", "active_holdings.json");
+    const raw = await readFile(filePath, "utf-8");
+    const parsed: HoldingsFile = JSON.parse(raw);
+
+    const holdings = toArray(parsed);
+
+    // If empty, return a stable shape (prevents front-end .map crashes)
+    if (!holdings.length) {
+      return NextResponse.json({
+        last_updated: new Date().toISOString(),
+        quote_as_of: null,
+        total_market_value: 0,
+        holdings: [],
+      });
     }
 
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    // Fetch prices sequentially to reduce rate/timeout risk
+    const priced = [];
+    let quoteAsOf: string | null = null;
 
-  const holdings: Holding[] = useMemo(() => {
-    const h = data?.holdings;
-    return Array.isArray(h) ? h : [];
-  }, [data]);
+    for (const h of holdings) {
+      const ticker = String(h.ticker || "").trim().toUpperCase();
+      const shares = Number(h.shares || 0);
 
-  const lastUpdated = data?.last_updated || data?.quote_as_of || "";
+      const { close, date } = await fetchEodCloseUSD(ticker);
+      if (!quoteAsOf && date) quoteAsOf = date;
 
-  const totalMarketValue = useMemo(() => {
-    if (typeof data?.total_market_value === "number") return data.total_market_value;
-    // fallback: sum
-    return holdings.reduce((sum, x) => sum + (Number(x.market_value) || 0), 0);
-  }, [data, holdings]);
+      const lastPrice = close ?? 0;
+      const marketValue = shares * lastPrice;
 
-  return (
-    <main style={{ padding: 24 }}>
-      <h1 style={{ fontSize: 48, fontWeight: 700, margin: 0 }}>Portfolio</h1>
+      priced.push({
+        ticker,
+        name: h.name ?? "",
+        shares,
+        cost_basis: h.cost_basis ?? null,
+        last_price: lastPrice,
+        market_value: marketValue,
+      });
+    }
 
-      {loading && <p style={{ marginTop: 16 }}>Loading…</p>}
+    const total = priced.reduce((s, x) => s + (Number(x.market_value) || 0), 0);
 
-      {!loading && errMsg && (
-        <div style={{ marginTop: 16, color: "crimson" }}>
-          <div style={{ fontWeight: 600 }}>Failed to load portfolio.</div>
-          <pre style={{ whiteSpace: "pre-wrap" }}>{errMsg}</pre>
-        </div>
-      )}
+    // weights
+    const withWeights = priced.map((x) => ({
+      ...x,
+      weight: total > 0 ? x.market_value / total : 0,
+    }));
 
-      {!loading && !errMsg && (
-        <>
-          <div style={{ marginTop: 16 }}>
-            <div>
-              Last updated:{" "}
-              <b>{lastUpdated ? lastUpdated : "—"}</b>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              Total market value: <b>{formatMoney(totalMarketValue)}</b>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 24, overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
-                  <th style={th}>Ticker</th>
-                  <th style={th}>Name</th>
-                  <th style={thRight}>Shares</th>
-                  <th style={thRight}>Last Price</th>
-                  <th style={thRight}>Market Value</th>
-                  <th style={thRight}>Weight</th>
-                  <th style={thRight}>Cost Basis</th>
-                </tr>
-              </thead>
-              <tbody>
-                {holdings.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ padding: 12 }}>
-                      No holdings found.
-                    </td>
-                  </tr>
-                ) : (
-                  holdings.map((h, idx) => (
-                    <tr key={`${h.ticker}-${idx}`} style={{ borderBottom: "1px solid #eee" }}>
-                      <td style={td}>{h.ticker}</td>
-                      <td style={td}>{h.name ?? ""}</td>
-                      <td style={tdRight}>{formatNumber(h.shares)}</td>
-                      <td style={tdRight}>{formatMoney(h.last_price ?? 0)}</td>
-                      <td style={tdRight}>{formatMoney(h.market_value ?? 0)}</td>
-                      <td style={tdRight}>{formatPct(h.weight)}</td>
-                      <td style={tdRight}>{formatMoney(h.cost_basis ?? 0)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-    </main>
-  );
-}
-
-const th: React.CSSProperties = { padding: 10, fontWeight: 700 };
-const thRight: React.CSSProperties = { ...th, textAlign: "right" };
-const td: React.CSSProperties = { padding: 10 };
-const tdRight: React.CSSProperties = { ...td, textAlign: "right" };
-
-function formatMoney(n: number) {
-  const v = Number.isFinite(n) ? n : 0;
-  return v.toLocaleString(undefined, { style: "currency", currency: "USD" });
-}
-
-function formatNumber(n: number) {
-  const v = Number.isFinite(n) ? n : 0;
-  return v.toLocaleString();
-}
-
-function formatPct(p?: number) {
-  const v = typeof p === "number" && Number.isFinite(p) ? p : 0;
-  // assume weight is 0-1; if already 0-100 this will look off but still safe
-  const asPct = v <= 1 ? v * 100 : v;
-  return `${asPct.toFixed(2)}%`;
+    return NextResponse.json({
+      last_updated: new Date().toISOString(),
+      quote_as_of: quoteAsOf,
+      total_market_value: total,
+      holdings: withWeights,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err?.message ?? String(err ?? "Unknown error") },
+      { status: 500 }
+    );
+  }
 }

@@ -24,19 +24,43 @@ export default function HomePage() {
   }, []);
 
   return (
-    <main className="home-main">
-      <h1>Bradley High Class Fund</h1>
+    <main className="homeShell">
+      <section className="homeCard">
+        <div className="kicker">Student-Selected Portfolio</div>
 
-      <p className="home-tagline">
-        An experiential student-selected investment portfolio focused on long-term capital appreciation.
-      </p>
+        <h1 className="homeTitle">Bradley High Class Fund</h1>
 
-      <div className="home-metrics-inline">
-        <span className="label">Portfolio Value:</span>
-        <span className="value">{value}</span>
-      </div>
+        <p className="homeSubtitle">
+          An experiential student-selected investment portfolio focused on long-term capital appreciation.
+        </p>
 
-      <div className="home-chart">Portfolio value growth chart will appear here.</div>
+        <div className="kpiRow">
+          <div className="kpi">
+            <div className="kpiLabel">Portfolio Value</div>
+            <div className="kpiValue">{value}</div>
+          </div>
+
+          <div className="kpi">
+            <div className="kpiLabel">Benchmark</div>
+            <div className="kpiValue kpiMuted">S&amp;P 500 (placeholder)</div>
+          </div>
+
+          <div className="kpi">
+            <div className="kpiLabel">Since</div>
+            <div className="kpiValue kpiMuted">—</div>
+          </div>
+        </div>
+
+        <div className="chartBox">
+          <div className="chartHeader">Portfolio Value Over Time</div>
+          <div className="chartPlaceholder">
+            Chart will appear here.
+            <div className="chartNote">
+              (Next step: store portfolio value history and render a simple line chart.)
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

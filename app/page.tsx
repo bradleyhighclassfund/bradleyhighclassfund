@@ -4,13 +4,17 @@ import { useEffect, useState } from "react";
 
 export default function HomePage() {
   const [value, setValue] = useState<string>("—");
+  const [dailyChange, setDailyChange] = useState<string>("—");
+  const [spChange, setSpChange] = useState<string>("—");
 
   useEffect(() => {
     fetch("/api/portfolio")
       .then((res) => res.json())
       .then((data) => {
         const v = data?.totalMarketValue;
-        if (typeof v === "number" && Number.isFinite(v)) {
+        const d = data?.dailyChange;
+
+        if (typeof v === "number") {
           setValue(
             v.toLocaleString("en-US", {
               style: "currency",
@@ -19,15 +23,32 @@ export default function HomePage() {
             })
           );
         }
+
+        if (typeof d === "number") {
+          const sign = d >= 0 ? "+" : "";
+          setDailyChange(`${sign}${d.toFixed(2)}%`);
+        }
       })
-      .catch(() => setValue("Unavailable"));
+      .catch(() => {
+        setValue("Unavailable");
+        setDailyChange("—");
+      });
+
+    fetch("/api/sp500")     // safe placeholder endpoint if exists later
+      .then((res) => res.json())
+      .then((data) => {
+        const c = data?.dailyChange;
+        if (typeof c === "number") {
+          const sign = c >= 0 ? "+" : "";
+          setSpChange(`${sign}${c.toFixed(2)}%`);
+        }
+      })
+      .catch(() => setSpChange("—"));
   }, []);
 
   return (
     <main className="homeShell">
-      <section className="homeCard">
-        <div className="kicker">Student-Selected Portfolio</div>
-
+      <section className="homeCard centered">
         <h1 className="homeTitle">Bradley High Class Fund</h1>
 
         <p className="homeSubtitle">
@@ -41,24 +62,19 @@ export default function HomePage() {
           </div>
 
           <div className="kpi">
-            <div className="kpiLabel">Benchmark</div>
-            <div className="kpiValue kpiMuted">S&amp;P 500 (placeholder)</div>
+            <div className="kpiLabel">Daily Portfolio Change</div>
+            <div className="kpiValue">{dailyChange}</div>
           </div>
 
           <div className="kpi">
-            <div className="kpiLabel">Since</div>
-            <div className="kpiValue kpiMuted">—</div>
+            <div className="kpiLabel">S&amp;P 500 Daily Change</div>
+            <div className="kpiValue kpiMuted">{spChange}</div>
           </div>
         </div>
 
         <div className="chartBox">
           <div className="chartHeader">Portfolio Value Over Time</div>
-          <div className="chartPlaceholder">
-            Chart will appear here.
-            <div className="chartNote">
-              (Next step: store portfolio value history and render a simple line chart.)
-            </div>
-          </div>
+          <div className="chartPlaceholder">Chart will appear here.</div>
         </div>
       </section>
     </main>

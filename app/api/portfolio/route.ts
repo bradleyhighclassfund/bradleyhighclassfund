@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
+export const runtime = "nodejs";
+
 type Holding = { ticker: string; name: string; shares: number; costBasis: number | null };
 
 function normalizeTicker(raw: string) {
@@ -12,35 +14,41 @@ function stooqSymbol(ticker: string) {
   return `${ticker.toLowerCase()}.us`;
 }
 
-async function fetchStooqClose(ticker: string): Promise<number | null> {
+/** Stooq historical daily CSV: Date,Open,High,Low,Close,Volume */
+async function fetchLastTwoCloses(ticker: string): Promise<{ close: number; prevClose: number } | null> {
   const sym = stooqSymbol(ticker);
-  const url = `https://stooq.com/q/l/?s=${encodeURIComponent(sym)}&f=sd2t2ohlcv&h&e=csv`;
+  const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}&i=d`;
 
   const res = await fetch(url, { next: { revalidate: 300 } });
   if (!res.ok) return null;
 
   const text = await res.text();
   const lines = text.trim().split("\n");
-  if (lines.length < 2) return null;
+  if (lines.length < 3) return null;
 
-  const cols = lines[1].split(",");
-  const close = Number(cols[6]);
+  const last = lines[lines.length - 1].split(",");
+  const prev = lines[lines.length - 2].split(",");
+
+  const close = Number(last[4]);
+  const prevClose = Number(prev[4]);
 
   if (!Number.isFinite(close) || close <= 0) return null;
-  return close;
+  if (!Number.isFinite(prevClose) || prevClose <= 0) return null;
+
+  return { close, prevClose };
 }
 
-async function fetchQuotes(tickers: string[]) {
+async function fetchCloses(tickers: string[]) {
   const CONCURRENCY = 8;
   const queue = [...tickers];
-  const out: Record<string, number> = {};
+  const out: Record<string, { close: number; prevClose: number }> = {};
 
   async function worker() {
     while (queue.length) {
       const t = queue.shift();
       if (!t) return;
-      const px = await fetchStooqClose(t);
-      if (px !== null) out[t] = px;
+      const r = await fetchLastTwoCloses(t);
+      if (r) out[t] = r;
     }
   }
 
@@ -48,85 +56,92 @@ async function fetchQuotes(tickers: string[]) {
   return out;
 }
 
-function readPriorValue(cachePath: string): number | null {
-  try {
-    if (!fs.existsSync(cachePath)) return null;
-    const raw = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
-    return typeof raw?.totalMarketValue === "number" ? raw.totalMarketValue : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(cachePath: string, totalMarketValue: number) {
-  try {
-    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
-    fs.writeFileSync(
-      cachePath,
-      JSON.stringify({ totalMarketValue, ts: new Date().toISOString() }),
-      "utf-8"
-    );
-  } catch {}
-}
-
 export async function GET() {
   try {
     const holdingsPath = path.join(process.cwd(), "data", "active_holdings.json");
-    const cachePath = path.join(process.cwd(), "data", "cache", "portfolio_snapshot.json");
-
     if (!fs.existsSync(holdingsPath)) {
-      return NextResponse.json({ error: "Missing active_holdings.json", positions: [] }, { status: 500 });
+      return NextResponse.json({ error: "Missing data/active_holdings.json", positions: [] }, { status: 500 });
     }
 
     const holdings: Holding[] = JSON.parse(fs.readFileSync(holdingsPath, "utf-8"));
 
     const cleaned = (holdings ?? [])
-      .filter(h => h && typeof h.ticker === "string" && typeof h.shares === "number")
-      .map(h => ({
+      .filter((h) => h && typeof h.ticker === "string" && typeof h.shares === "number")
+      .map((h) => ({
         ticker: normalizeTicker(h.ticker),
         name: String(h.name ?? "").trim(),
         shares: h.shares,
         costBasis: typeof h.costBasis === "number" ? h.costBasis : null,
       }))
-      .filter(h => h.ticker.length > 0 && h.shares > 0);
+      .filter((h) => h.ticker.length > 0 && h.shares > 0);
 
-    const symbols = Array.from(new Set(cleaned.map(h => h.ticker))).slice(0, 200);
-    const priceMap = await fetchQuotes(symbols);
+    const symbols = Array.from(new Set(cleaned.map((h) => h.ticker))).slice(0, 200);
 
-    const positions = cleaned.map(h => {
-      const price = priceMap[h.ticker];
-      const priceVal = typeof price === "number" ? price : null;
-      const marketValue = priceVal === null ? null : priceVal * h.shares;
+    const closeMap = await fetchCloses(symbols);
+
+    const positions = cleaned.map((h) => {
+      const rec = closeMap[h.ticker];
+      const price = rec?.close ?? null;
+      const prevClose = rec?.prevClose ?? null;
+
+      const marketValue = price === null ? null : price * h.shares;
+
+      const dailyPct =
+        price !== null && prevClose !== null && prevClose > 0
+          ? ((price - prevClose) / prevClose) * 100
+          : null;
 
       return {
         ticker: h.ticker,
         name: h.name,
         shares: h.shares,
         costBasis: h.costBasis,
-        price: priceVal,
+        price,
+        prevClose,
         marketValue,
+        dailyPct,
       };
     });
 
     const totalMarketValue = positions.reduce((sum, p) => sum + (p.marketValue ?? 0), 0);
 
-    const priorValue = readPriorValue(cachePath);
-
+    // MV-weighted average of dailyPct across positions with valid dailyPct
     let dailyChange: number | null = null;
+    if (totalMarketValue > 0) {
+      let weightedSum = 0;
+      let weightBase = 0;
 
-    if (priorValue && priorValue > 0) {
-      dailyChange = ((totalMarketValue - priorValue) / priorValue) * 100;
+      for (const p of positions) {
+        if (typeof p.marketValue === "number" && typeof p.dailyPct === "number") {
+          weightedSum += p.marketValue * p.dailyPct;
+          weightBase += p.marketValue;
+        }
+      }
+
+      if (weightBase > 0) dailyChange = weightedSum / weightBase;
     }
 
-    writeCache(cachePath, totalMarketValue);
+    const withWeights = positions.map((p) => ({
+      ...p,
+      weight:
+        typeof p.marketValue === "number" && totalMarketValue > 0
+          ? p.marketValue / totalMarketValue
+          : null,
+    }));
 
-    return NextResponse.json({
-      last_updated: new Date().toISOString(),
-      quote_source: "stooq (EOD/close)",
-      totalMarketValue,
-      dailyChange,
-      positions,
-    });
+    const missing = symbols.filter((s) => closeMap[s] == null);
+
+    return NextResponse.json(
+      {
+        last_updated: new Date().toISOString(),
+        quote_source: "stooq (daily close; daily change uses last two closes)",
+        totalMarketValue,
+        dailyChange,
+        positions: withWeights,
+        missing,
+      },
+      { status: 200 }
+    );
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Server error", positions: [] }, { status: 500 });
   }

@@ -26,4 +26,12 @@ body {
   font-size: 12px;
   color: #444;
   background: #fff;
+}/* Prevent any horizontal clipping/shift */
+body { overflow-x: hidden; }
+
+/* Ensure main content never hugs the left edge */
+.home-main {
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
 }

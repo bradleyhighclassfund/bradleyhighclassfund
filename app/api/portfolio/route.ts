@@ -24,7 +24,7 @@ async function fetchStooqClose(ticker: string): Promise<number | null> {
   if (lines.length < 2) return null;
 
   const cols = lines[1].split(",");
-  const close = Number(cols[6]); // Close
+  const close = Number(cols[6]);
 
   if (!Number.isFinite(close) || close <= 0) return null;
   return close;
@@ -48,11 +48,34 @@ async function fetchQuotes(tickers: string[]) {
   return out;
 }
 
+function readPriorValue(cachePath: string): number | null {
+  try {
+    if (!fs.existsSync(cachePath)) return null;
+    const raw = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
+    return typeof raw?.totalMarketValue === "number" ? raw.totalMarketValue : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(cachePath: string, totalMarketValue: number) {
+  try {
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    fs.writeFileSync(
+      cachePath,
+      JSON.stringify({ totalMarketValue, ts: new Date().toISOString() }),
+      "utf-8"
+    );
+  } catch {}
+}
+
 export async function GET() {
   try {
     const holdingsPath = path.join(process.cwd(), "data", "active_holdings.json");
+    const cachePath = path.join(process.cwd(), "data", "cache", "portfolio_snapshot.json");
+
     if (!fs.existsSync(holdingsPath)) {
-      return NextResponse.json({ error: "Missing data/active_holdings.json", positions: [] }, { status: 500 });
+      return NextResponse.json({ error: "Missing active_holdings.json", positions: [] }, { status: 500 });
     }
 
     const holdings: Holding[] = JSON.parse(fs.readFileSync(holdingsPath, "utf-8"));
@@ -87,26 +110,23 @@ export async function GET() {
 
     const totalMarketValue = positions.reduce((sum, p) => sum + (p.marketValue ?? 0), 0);
 
-    const withWeights = positions.map(p => ({
-      ...p,
-      weight:
-        typeof p.marketValue === "number" && totalMarketValue > 0
-          ? p.marketValue / totalMarketValue
-          : null,
-    }));
+    const priorValue = readPriorValue(cachePath);
 
-    const missing = symbols.filter(s => priceMap[s] == null);
+    let dailyChange: number | null = null;
 
-    return NextResponse.json(
-      {
-        last_updated: new Date().toISOString(),
-        quote_source: "stooq (EOD/close)",
-        totalMarketValue,
-        positions: withWeights,
-        missing,
-      },
-      { status: 200 }
-    );
+    if (priorValue && priorValue > 0) {
+      dailyChange = ((totalMarketValue - priorValue) / priorValue) * 100;
+    }
+
+    writeCache(cachePath, totalMarketValue);
+
+    return NextResponse.json({
+      last_updated: new Date().toISOString(),
+      quote_source: "stooq (EOD/close)",
+      totalMarketValue,
+      dailyChange,
+      positions,
+    });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Server error", positions: [] }, { status: 500 });
   }

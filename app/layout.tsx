@@ -13,6 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="top-nav">
           <div className="top-nav-inner">
             <nav>
+              <a href="/">Home</a>
               <a href="/about">About</a>
               <a href="/portfolio">Portfolio</a>
               <a href="/methodology">Method</a>
@@ -20,7 +21,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
-        <div className="page-wrap">{children}</div>
+        <div className="page-wrap">
+          {children}
+        </div>
 
         <footer className="site-footer">
           <div>

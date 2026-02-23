@@ -21,10 +21,10 @@ body {
   overflow-x: hidden;
 }
 
-/* ---------- TOP NAV ---------- */
+/* ---------- TOP NAVIGATION ---------- */
 
 .top-nav {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid #dfe7f3;
 }
@@ -53,6 +53,11 @@ body {
 
 .top-nav a:hover {
   background: rgba(22, 50, 92, 0.07);
+}
+
+/* Slight emphasis on Home */
+.top-nav nav a:first-child {
+  font-weight: 600;
 }
 
 /* ---------- PAGE CONTAINER ---------- */
@@ -123,15 +128,19 @@ body {
   margin-bottom: 6px;
 }
 
+/* CRITICAL: unified typography */
 .kpiValue {
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   font-size: 22px;
   font-weight: 650;
   letter-spacing: -0.01em;
 }
 
+/* Muted KPI values (S&P tile consistency fix) */
 .kpiMuted {
-  font-size: 16px;
-  font-weight: 600;
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 650;
   opacity: 0.75;
 }
 
@@ -157,6 +166,24 @@ body {
   padding: 28px 16px 34px;
   font-size: 14px;
   color: #546074;
+}
+
+.chartNote {
+  padding: 10px 16px 16px;
+  font-size: 12px;
+  color: #546074;
+  border-top: 1px solid #dfe7f3;
+  background: #fbfdff;
+}
+
+/* ---------- PERFORMANCE IMAGE PANEL ---------- */
+
+.performanceImage {
+  width: 100%;
+  height: auto;
+  display: block;
+  margin-top: 12px;
+  border-radius: 12px;
 }
 
 /* ---------- FOOTER ---------- */

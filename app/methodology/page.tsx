@@ -5,13 +5,13 @@ export default function MethodologyPage() {
 
       <h3>Selection</h3>
       <p>Holdings are selected by students. Teams are asked to consider the overall diversification benefits given the current
-        positions.</p>
+        positions in the portfolio.</p>
 
       <h3>Portfolio</h3>
       <ul>
         <li>Only active positions are shown in the Portfolio page and included in totals/weights.</li>
-        <li>See the Actions tab for sold positions, buyouts, M&A, and spinoffs</li>
-        <li>Quotes are delayed and refreshed on a schedule.</li>
+        <li>See the Actions tab for sold positions, buyouts, M&A, and spinoffs.</li>
+        <li>Quotes are delayed.</li>
       </ul>
     </main>
   );

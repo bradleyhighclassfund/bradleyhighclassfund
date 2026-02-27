@@ -8,25 +8,31 @@ export default function HomePage() {
   const [sp500DailyChange, setSp500DailyChange] = useState<number | null>(null);
 
   useEffect(() => {
-    async function fetchData() {
+    async function fetchPortfolio() {
       try {
         const res = await fetch("/api/portfolio");
         const data = await res.json();
-
-        setPortfolioValue(data.totalMarketValue ?? null);
-        setPortfolioDailyChange(data.dailyChange ?? null);
-
-        // If you have a separate S&P endpoint, adjust here.
-        // Otherwise this assumes you are computing it elsewhere.
-        if (data.sp500DailyChange !== undefined) {
-          setSp500DailyChange(data.sp500DailyChange);
-        }
+        setPortfolioValue(typeof data.totalMarketValue === "number" ? data.totalMarketValue : null);
+        setPortfolioDailyChange(typeof data.dailyChange === "number" ? data.dailyChange : null);
       } catch (e) {
-        console.error("Error fetching portfolio data:", e);
+        console.error("Error fetching portfolio:", e);
       }
     }
 
-    fetchData();
+    async function fetchSP500() {
+      try {
+        // If your endpoint name differs, change it here
+        const res = await fetch("/api/sp500");
+        const data = await res.json();
+        setSp500DailyChange(typeof data.dailyChange === "number" ? data.dailyChange : null);
+      } catch (e) {
+        console.error("Error fetching S&P 500:", e);
+        setSp500DailyChange(null);
+      }
+    }
+
+    fetchPortfolio();
+    fetchSP500();
   }, []);
 
   const formatCurrency = (val: number | null) =>
@@ -36,18 +42,9 @@ export default function HomePage() {
     val !== null ? `${val >= 0 ? "+" : ""}${val.toFixed(2)}%` : "—";
 
   const portfolioClass =
-    portfolioDailyChange !== null
-      ? portfolioDailyChange >= 0
-        ? "pos"
-        : "neg"
-      : "";
+    portfolioDailyChange !== null ? (portfolioDailyChange >= 0 ? "pos" : "neg") : "";
 
-  const spClass =
-    sp500DailyChange !== null
-      ? sp500DailyChange >= 0
-        ? "pos"
-        : "neg"
-      : "";
+  const spClass = sp500DailyChange !== null ? (sp500DailyChange >= 0 ? "pos" : "neg") : "";
 
   return (
     <main className="homeShell">
@@ -57,7 +54,6 @@ export default function HomePage() {
           An experiential student-selected investment portfolio focused on long-term capital appreciation.
         </p>
 
-        {/* KPI ROW */}
         <div className="kpiRow">
           <div className="kpi">
             <div className="kpiLabel">Portfolio Value</div>
@@ -66,28 +62,19 @@ export default function HomePage() {
 
           <div className="kpi">
             <div className="kpiLabel">Daily Portfolio Change</div>
-            <div className={`kpiValue ${portfolioClass}`}>
-              {formatPercent(portfolioDailyChange)}
-            </div>
+            <div className={`kpiValue ${portfolioClass}`}>{formatPercent(portfolioDailyChange)}</div>
           </div>
 
           <div className="kpi">
             <div className="kpiLabel">S&amp;P 500 Daily Change</div>
-            <div className={`kpiValue ${spClass}`}>
-              {formatPercent(sp500DailyChange)}
-            </div>
+            <div className={`kpiValue ${spClass}`}>{formatPercent(sp500DailyChange)}</div>
           </div>
         </div>
 
-        {/* PERFORMANCE IMAGE */}
         <div className="chartBox">
           <div className="chartHeader">Portfolio Value Over Time</div>
 
-          <img
-            src="/performance.png"
-            alt="Portfolio performance"
-            className="performanceImage"
-          />
+          <img src="/performance.png" alt="Portfolio performance" className="performanceImage" />
         </div>
       </section>
     </main>

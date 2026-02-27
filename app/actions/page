@@ -1,1 +1,16 @@
+export default function ActionsPage() {
+  return (
+    <main className="homeShell">
+      <section className="contentCard">
+        <h1 className="contentTitle">Actions</h1>
 
+        <div className="prose">
+          <p>
+            This page will summarize portfolio actions such as additions, trims, exits, and corporate actions (splits,
+            mergers, symbol changes). Content coming soon.
+          </p>
+        </div>
+      </section>
+    </main>
+  );
+}

@@ -7,9 +7,9 @@ export default function AboutPage() {
         <div className="prose">
           <p>
             The fund originated from an early classroom discussion concerning the growing accessibility of online
-            brokerage accounts and the evolving mechanics of electronic trading. During this period, when 
-            digital trading platforms were still developing, an initial investment was executed following 
-            student debate and a collective class vote.
+            brokerage accounts and the evolving mechanics of electronic trading. During this period, when digital
+            trading platforms were still developing, an initial investment was executed following student debate and a
+            collective class vote.
           </p>
 
           <p>
@@ -25,10 +25,10 @@ export default function AboutPage() {
           </p>
 
           <p>
-            Capital contributions began at $1,000 and increased in fixed increments to resemble investors' life cycle. 
-            The program now operates with typical annual contributions of $5,000. Allocation decisions including whether to 
-            concentrate capital in a single security or diversify across two or more selections are determined collectively
-            and solely based on student recommendations and class deliberation.
+            Capital contributions began at $1,000 and increased in fixed increments to resemble investors&apos; life
+            cycle. The program now operates with typical annual contributions of $5,000. Allocation decisions including
+            whether to concentrate capital in a single security or diversify across two or more selections are
+            determined collectively and solely based on student recommendations and class deliberation.
           </p>
         </div>
       </section>

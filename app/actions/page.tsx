@@ -337,13 +337,5 @@ export default function ActionsPage() {
             <li>Identify the only discretionary sales (ORCL, KKD).</li>
             <li>Provide a traceable lineage from explicit buys to today&apos;s holdings, including corporate-action tickers.</li>
           </ul>
-
-          <p style={{ marginTop: 10 }}>
-            Next step: if you want a complete audit trail (dates, predecessor tickers, and transaction events for every item),
-            we can extend this page to ingest a machine-readable ledger (CSV/JSON) and auto-generate the lineage map.
-          </p>
-        </div>
-      </section>
-    </main>
   );
 }

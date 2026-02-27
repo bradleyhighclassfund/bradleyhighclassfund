@@ -16,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <a href="/">Home</a>
               <a href="/about">About</a>
               <a href="/portfolio">Portfolio</a>
+              <a href="/ondeck">On Deck</a>
               <a href="/methodology">Method</a>
             </nav>
           </div>
@@ -28,8 +29,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="site-footer">
           <div>
             This website is for educational purposes only and reflects positions selected by students.
-            Holdings and cost basis may be reconstructed from historical purchase data and adjusted for corporate actions using market-value allocation.
-            Figures may differ from custodian records. Quotes may be delayed.
+            Holdings and cost basis may be reconstructed from historical purchase data and adjusted for corporate actions
+            using market-value allocation. Figures may differ from custodian records. Quotes may be delayed.
             This website does not constitute investment advice or an offer to buy or sell securities.
           </div>
         </footer>

@@ -20,80 +20,84 @@ function normalizeTicker(raw: string) {
   return raw.trim().toUpperCase().replace(".", "-");
 }
 
-async function fetchFmpQuotes(
+function yahooSymbol(ticker: string) {
+  // Yahoo uses BRK-B style, which matches our normalized format.
+  return ticker;
+}
+
+async function fetchYahooQuote(ticker: string): Promise<QuoteRecord | null> {
+  const symbol = yahooSymbol(ticker);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+    symbol
+  )}?interval=1d&range=5d`;
+
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        Accept: "application/json,text/plain,*/*",
+      },
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+
+    const result = data?.chart?.result?.[0];
+    if (!result) return null;
+
+    const closes = result?.indicators?.quote?.[0]?.close;
+    if (!Array.isArray(closes)) return null;
+
+    const validCloses = closes
+      .map((x: any) => Number(x))
+      .filter((x: number) => Number.isFinite(x) && x > 0);
+
+    if (validCloses.length < 2) return null;
+
+    const close = validCloses[validCloses.length - 1];
+    const prevClose = validCloses[validCloses.length - 2];
+
+    if (!Number.isFinite(close) || !Number.isFinite(prevClose)) return null;
+
+    return { close, prevClose };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchYahooQuotes(
   tickers: string[]
 ): Promise<{
   quotes: Record<string, QuoteRecord>;
   debug: any[];
 }> {
-  const apiKey = process.env.FMP_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Missing FMP_API_KEY");
-  }
-
-  const chunks: string[][] = [];
-  for (let i = 0; i < tickers.length; i += 25) {
-    chunks.push(tickers.slice(i, i + 25));
-  }
-
   const quotes: Record<string, QuoteRecord> = {};
   const debug: any[] = [];
 
-  for (const chunk of chunks) {
-    const symbols = chunk.join(",");
-    const url = `https://financialmodelingprep.com/api/v3/quote/${encodeURIComponent(
-      symbols
-    )}?apikey=${apiKey}`;
+  const CONCURRENCY = 4;
+  const queue = [...tickers];
 
-    try {
-      const res = await fetch(url, { cache: "no-store" });
-      const text = await res.text();
+  async function worker() {
+    while (queue.length) {
+      const ticker = queue.shift();
+      if (!ticker) return;
 
-      let data: any = null;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = text;
+      const quote = await fetchYahooQuote(ticker);
+
+      if (quote) {
+        quotes[ticker] = quote;
+      } else {
+        debug.push({
+          ticker,
+          error: "No valid Yahoo quote returned",
+        });
       }
-
-      debug.push({
-        symbols,
-        status: res.status,
-        ok: res.ok,
-        preview:
-          typeof data === "string"
-            ? data.slice(0, 200)
-            : Array.isArray(data)
-            ? `array(${data.length})`
-            : JSON.stringify(data).slice(0, 200),
-      });
-
-      if (!res.ok) continue;
-      if (!Array.isArray(data)) continue;
-
-      for (const row of data) {
-        const symbol = normalizeTicker(String(row.symbol ?? ""));
-        const price = Number(row.price);
-        const prevClose = Number(row.previousClose);
-
-        if (
-          symbol &&
-          Number.isFinite(price) &&
-          price > 0 &&
-          Number.isFinite(prevClose) &&
-          prevClose > 0
-        ) {
-          quotes[symbol] = { close: price, prevClose };
-        }
-      }
-    } catch (err: any) {
-      debug.push({
-        symbols,
-        error: err?.message ?? "fetch failed",
-      });
     }
   }
+
+  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 
   return { quotes, debug };
 }
@@ -123,18 +127,17 @@ export async function GET() {
 
     const symbols = Array.from(new Set(cleaned.map((h) => h.ticker))).slice(0, 200);
 
-    const { quotes: closeMap, debug } = await fetchFmpQuotes(symbols);
+    const { quotes: closeMap, debug } = await fetchYahooQuotes(symbols);
     const missing = symbols.filter((s) => closeMap[s] == null);
 
     if (symbols.length > 0 && missing.length === symbols.length) {
       return NextResponse.json(
         {
           error: "Quote provider failed for all symbols",
-          quote_source: "financialmodelingprep",
+          quote_source: "yahoo_chart_endpoint",
           positions: [],
           missing,
           debug,
-          hasApiKey: !!process.env.FMP_API_KEY,
         },
         { status: 502 }
       );
@@ -199,14 +202,13 @@ export async function GET() {
     return NextResponse.json(
       {
         last_updated: new Date().toISOString(),
-        quote_source: "financialmodelingprep",
+        quote_source: "yahoo_chart_endpoint",
         totalMarketValue,
         dailyChange,
         positions: withWeights,
         missing,
         quote_success_count: symbols.length - missing.length,
         quote_failure_count: missing.length,
-        hasApiKey: !!process.env.FMP_API_KEY,
         debug,
       },
       { status: 200 }
@@ -216,7 +218,6 @@ export async function GET() {
       {
         error: e?.message ?? "Server error",
         positions: [],
-        hasApiKey: !!process.env.FMP_API_KEY,
       },
       { status: 500 }
     );

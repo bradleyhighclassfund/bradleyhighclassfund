@@ -1,29 +1,56 @@
 import { NextResponse } from "next/server";
+
 export const runtime = "nodejs";
 
 export async function GET() {
-  const url = "https://stooq.com/q/d/l/?s=spy.us&i=d";
-  const res = await fetch(url, { next: { revalidate: 300 } });
-  if (!res.ok) return NextResponse.json({ dailyChange: null }, { status: 200 });
+  try {
+    const url =
+      "https://query1.finance.yahoo.com/v8/finance/chart/SPY?interval=1d&range=5d";
 
-  const text = await res.text();
-  const lines = text.trim().split("\n");
-  if (lines.length < 3) return NextResponse.json({ dailyChange: null }, { status: 200 });
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        Accept: "application/json,text/plain,*/*",
+      },
+    });
 
-  const last = lines[lines.length - 1].split(",");
-  const prev = lines[lines.length - 2].split(",");
+    if (!res.ok) {
+      return NextResponse.json({ dailyChange: null }, { status: 200 });
+    }
 
-  const close = Number(last[4]);
-  const prevClose = Number(prev[4]);
+    const data = await res.json();
+    const result = data?.chart?.result?.[0];
+    const closes = result?.indicators?.quote?.[0]?.close;
 
-  if (!Number.isFinite(close) || !Number.isFinite(prevClose) || prevClose <= 0) {
+    if (!Array.isArray(closes)) {
+      return NextResponse.json({ dailyChange: null }, { status: 200 });
+    }
+
+    const validCloses = closes
+      .map((x: any) => Number(x))
+      .filter((x: number) => Number.isFinite(x) && x > 0);
+
+    if (validCloses.length < 2) {
+      return NextResponse.json({ dailyChange: null }, { status: 200 });
+    }
+
+    const close = validCloses[validCloses.length - 1];
+    const prevClose = validCloses[validCloses.length - 2];
+    const dailyChange = ((close - prevClose) / prevClose) * 100;
+
+    return NextResponse.json(
+      {
+        last_updated: new Date().toISOString(),
+        proxy: "SPY",
+        quote_source: "yahoo_chart_endpoint",
+        dailyChange,
+        close,
+        prevClose,
+      },
+      { status: 200 }
+    );
+  } catch {
     return NextResponse.json({ dailyChange: null }, { status: 200 });
   }
-
-  const dailyChange = ((close - prevClose) / prevClose) * 100;
-
-  return NextResponse.json(
-    { last_updated: new Date().toISOString(), proxy: "SPY", dailyChange, close, prevClose },
-    { status: 200 }
-  );
 }

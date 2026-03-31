@@ -20,8 +20,14 @@ function normalizeTicker(raw: string) {
   return raw.trim().toUpperCase().replace(".", "-");
 }
 
-async function fetchFmpQuotes(tickers: string[]): Promise<Record<string, QuoteRecord>> {
+async function fetchFmpQuotes(
+  tickers: string[]
+): Promise<{
+  quotes: Record<string, QuoteRecord>;
+  debug: any[];
+}> {
   const apiKey = process.env.FMP_API_KEY;
+
   if (!apiKey) {
     throw new Error("Missing FMP_API_KEY");
   }
@@ -31,41 +37,71 @@ async function fetchFmpQuotes(tickers: string[]): Promise<Record<string, QuoteRe
     chunks.push(tickers.slice(i, i + 25));
   }
 
-  const out: Record<string, QuoteRecord> = {};
+  const quotes: Record<string, QuoteRecord> = {};
+  const debug: any[] = [];
 
   for (const chunk of chunks) {
     const symbols = chunk.join(",");
-    const url = `https://financialmodelingprep.com/api/v3/quote/${encodeURIComponent(symbols)}?apikey=${apiKey}`;
+    const url = `https://financialmodelingprep.com/api/v3/quote/${encodeURIComponent(
+      symbols
+    )}?apikey=${apiKey}`;
 
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) continue;
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      const text = await res.text();
 
-    const data = await res.json();
-    if (!Array.isArray(data)) continue;
-
-    for (const row of data) {
-      const symbol = normalizeTicker(String(row.symbol ?? ""));
-      const price = Number(row.price);
-      const prevClose = Number(row.previousClose);
-
-      if (
-        symbol &&
-        Number.isFinite(price) &&
-        price > 0 &&
-        Number.isFinite(prevClose) &&
-        prevClose > 0
-      ) {
-        out[symbol] = { close: price, prevClose };
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = text;
       }
+
+      debug.push({
+        symbols,
+        status: res.status,
+        ok: res.ok,
+        preview:
+          typeof data === "string"
+            ? data.slice(0, 200)
+            : Array.isArray(data)
+            ? `array(${data.length})`
+            : JSON.stringify(data).slice(0, 200),
+      });
+
+      if (!res.ok) continue;
+      if (!Array.isArray(data)) continue;
+
+      for (const row of data) {
+        const symbol = normalizeTicker(String(row.symbol ?? ""));
+        const price = Number(row.price);
+        const prevClose = Number(row.previousClose);
+
+        if (
+          symbol &&
+          Number.isFinite(price) &&
+          price > 0 &&
+          Number.isFinite(prevClose) &&
+          prevClose > 0
+        ) {
+          quotes[symbol] = { close: price, prevClose };
+        }
+      }
+    } catch (err: any) {
+      debug.push({
+        symbols,
+        error: err?.message ?? "fetch failed",
+      });
     }
   }
 
-  return out;
+  return { quotes, debug };
 }
 
 export async function GET() {
   try {
     const holdingsPath = path.join(process.cwd(), "data", "active_holdings.json");
+
     if (!fs.existsSync(holdingsPath)) {
       return NextResponse.json(
         { error: "Missing data/active_holdings.json", positions: [] },
@@ -86,8 +122,8 @@ export async function GET() {
       .filter((h) => h.ticker.length > 0 && h.shares > 0);
 
     const symbols = Array.from(new Set(cleaned.map((h) => h.ticker))).slice(0, 200);
-    const closeMap = await fetchFmpQuotes(symbols);
 
+    const { quotes: closeMap, debug } = await fetchFmpQuotes(symbols);
     const missing = symbols.filter((s) => closeMap[s] == null);
 
     if (symbols.length > 0 && missing.length === symbols.length) {
@@ -97,6 +133,8 @@ export async function GET() {
           quote_source: "financialmodelingprep",
           positions: [],
           missing,
+          debug,
+          hasApiKey: !!process.env.FMP_API_KEY,
         },
         { status: 502 }
       );
@@ -106,7 +144,9 @@ export async function GET() {
       const rec = closeMap[h.ticker];
       const price = rec?.close ?? null;
       const prevClose = rec?.prevClose ?? null;
+
       const marketValue = price === null ? null : price * h.shares;
+
       const dailyPct =
         price !== null && prevClose !== null && prevClose > 0
           ? ((price - prevClose) / prevClose) * 100
@@ -166,12 +206,18 @@ export async function GET() {
         missing,
         quote_success_count: symbols.length - missing.length,
         quote_failure_count: missing.length,
+        hasApiKey: !!process.env.FMP_API_KEY,
+        debug,
       },
       { status: 200 }
     );
   } catch (e: any) {
     return NextResponse.json(
-      { error: e?.message ?? "Server error", positions: [] },
+      {
+        error: e?.message ?? "Server error",
+        positions: [],
+        hasApiKey: !!process.env.FMP_API_KEY,
+      },
       { status: 500 }
     );
   }

@@ -20,104 +20,52 @@ function normalizeTicker(raw: string) {
   return raw.trim().toUpperCase().replace(".", "-");
 }
 
-function stooqSymbol(ticker: string) {
-  return `${ticker.toLowerCase()}.us`;
-}
-
-async function fetchTextWithTimeout(url: string, ms = 8000): Promise<string | null> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ms);
-
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      cache: "no-store",
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        Accept: "text/csv,text/plain,*/*",
-      },
-    });
-
-    if (!res.ok) return null;
-
-    return await res.text();
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-/**
- * Stooq historical daily CSV:
- * Date,Open,High,Low,Close,Volume
- */
-async function fetchLastTwoCloses(ticker: string): Promise<QuoteRecord | null> {
-  const sym = stooqSymbol(ticker);
-  const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}&i=d`;
-
-  const text = await fetchTextWithTimeout(url);
-  if (!text) return null;
-
-  const lines = text
-    .trim()
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  if (lines.length < 3) return null;
-
-  // Basic validation: first line should look like CSV header
-  const header = lines[0].toLowerCase();
-  if (!header.includes("date") || !header.includes("close")) {
-    return null;
+async function fetchFmpQuotes(tickers: string[]): Promise<Record<string, QuoteRecord>> {
+  const apiKey = process.env.FMP_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing FMP_API_KEY");
   }
 
-  const rows = lines.slice(1);
+  const chunks: string[][] = [];
+  for (let i = 0; i < tickers.length; i += 25) {
+    chunks.push(tickers.slice(i, i + 25));
+  }
 
-  // Keep only rows that parse correctly and have positive close
-  const parsed = rows
-    .map((row) => row.split(","))
-    .filter((cols) => cols.length >= 5)
-    .map((cols) => ({
-      date: cols[0],
-      close: Number(cols[4]),
-    }))
-    .filter((r) => Number.isFinite(r.close) && r.close > 0);
-
-  if (parsed.length < 2) return null;
-
-  const last = parsed[parsed.length - 1];
-  const prev = parsed[parsed.length - 2];
-
-  return {
-    close: last.close,
-    prevClose: prev.close,
-  };
-}
-
-async function fetchCloses(tickers: string[]) {
-  const CONCURRENCY = 6;
-  const queue = [...tickers];
   const out: Record<string, QuoteRecord> = {};
 
-  async function worker() {
-    while (queue.length) {
-      const t = queue.shift();
-      if (!t) return;
-      const r = await fetchLastTwoCloses(t);
-      if (r) out[t] = r;
+  for (const chunk of chunks) {
+    const symbols = chunk.join(",");
+    const url = `https://financialmodelingprep.com/api/v3/quote/${encodeURIComponent(symbols)}?apikey=${apiKey}`;
+
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) continue;
+
+    const data = await res.json();
+    if (!Array.isArray(data)) continue;
+
+    for (const row of data) {
+      const symbol = normalizeTicker(String(row.symbol ?? ""));
+      const price = Number(row.price);
+      const prevClose = Number(row.previousClose);
+
+      if (
+        symbol &&
+        Number.isFinite(price) &&
+        price > 0 &&
+        Number.isFinite(prevClose) &&
+        prevClose > 0
+      ) {
+        out[symbol] = { close: price, prevClose };
+      }
     }
   }
 
-  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
   return out;
 }
 
 export async function GET() {
   try {
     const holdingsPath = path.join(process.cwd(), "data", "active_holdings.json");
-
     if (!fs.existsSync(holdingsPath)) {
       return NextResponse.json(
         { error: "Missing data/active_holdings.json", positions: [] },
@@ -138,16 +86,15 @@ export async function GET() {
       .filter((h) => h.ticker.length > 0 && h.shares > 0);
 
     const symbols = Array.from(new Set(cleaned.map((h) => h.ticker))).slice(0, 200);
+    const closeMap = await fetchFmpQuotes(symbols);
 
-    const closeMap = await fetchCloses(symbols);
     const missing = symbols.filter((s) => closeMap[s] == null);
 
-    // If EVERYTHING failed, do not pretend the fund is worth $0
     if (symbols.length > 0 && missing.length === symbols.length) {
       return NextResponse.json(
         {
           error: "Quote provider failed for all symbols",
-          quote_source: "stooq",
+          quote_source: "financialmodelingprep",
           positions: [],
           missing,
         },
@@ -159,9 +106,7 @@ export async function GET() {
       const rec = closeMap[h.ticker];
       const price = rec?.close ?? null;
       const prevClose = rec?.prevClose ?? null;
-
       const marketValue = price === null ? null : price * h.shares;
-
       const dailyPct =
         price !== null && prevClose !== null && prevClose > 0
           ? ((price - prevClose) / prevClose) * 100
@@ -214,7 +159,7 @@ export async function GET() {
     return NextResponse.json(
       {
         last_updated: new Date().toISOString(),
-        quote_source: "stooq (daily close; daily change uses last two closes)",
+        quote_source: "financialmodelingprep",
         totalMarketValue,
         dailyChange,
         positions: withWeights,

@@ -67,14 +67,19 @@ export default function HomePage() {
       : "";
 
   const spClass =
-    sp500DailyChange !== null ? (sp500DailyChange >= 0 ? "pos" : "neg") : "";
+    sp500DailyChange !== null
+      ? sp500DailyChange >= 0
+        ? "pos"
+        : "neg"
+      : "";
 
   return (
     <main className="homeShell">
       <section className="hero">
         <h1 className="title">Bradley High Class Fund</h1>
         <p className="subtitle">
-          An experiential student-selected investment portfolio focused on long-term capital appreciation.
+          An experiential student-selected investment portfolio focused on
+          long-term capital appreciation.
         </p>
 
         <div className="kpiRow">
@@ -100,11 +105,13 @@ export default function HomePage() {
 
         <div className="chartBox">
           <div className="chartHeader">Portfolio Value Over Time</div>
+
           <img
             src="/performance.png"
             alt="Portfolio performance"
             className="performanceImage"
           />
+
           <img
             src="/portfolio_beta_homepage.png"
             alt="Portfolio beta over time"

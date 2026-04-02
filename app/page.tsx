@@ -1,97 +1,72 @@
-"use client";
+import Image from "next/image";
 
-import { useEffect, useState } from "react";
-
-export default function HomePage() {
-  const [portfolioValue, setPortfolioValue] = useState<number | null>(null);
-  const [portfolioDailyChange, setPortfolioDailyChange] = useState<number | null>(null);
-  const [sp500DailyChange, setSp500DailyChange] = useState<number | null>(null);
-
-  useEffect(() => {
-    async function fetchPortfolio() {
-      try {
-        const res = await fetch("/api/portfolio");
-        const data = await res.json();
-        setPortfolioValue(typeof data.totalMarketValue === "number" ? data.totalMarketValue : null);
-        setPortfolioDailyChange(typeof data.dailyChange === "number" ? data.dailyChange : null);
-      } catch (e) {
-        console.error("Error fetching portfolio:", e);
-      }
-    }
-
-    async function fetchSP500() {
-      try {
-        const res = await fetch("/api/sp500");
-        const data = await res.json();
-        setSp500DailyChange(typeof data.dailyChange === "number" ? data.dailyChange : null);
-      } catch (e) {
-        console.error("Error fetching S&P 500:", e);
-        setSp500DailyChange(null);
-      }
-    }
-
-    fetchPortfolio();
-    fetchSP500();
-  }, []);
-
-  const formatCurrency = (val: number | null) =>
-    val !== null ? `$${val.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—";
-
-  const formatPercent = (val: number | null) =>
-    val !== null ? `${val >= 0 ? "+" : ""}${val.toFixed(2)}%` : "—";
-
-  const portfolioClass =
-    portfolioDailyChange !== null ? (portfolioDailyChange >= 0 ? "pos" : "neg") : "";
-
-  const spClass = sp500DailyChange !== null ? (sp500DailyChange >= 0 ? "pos" : "neg") : "";
-
+export default function Home() {
   return (
-    <main className="homeShell">
-      <section className="homeCard centered">
-        <h1 className="homeTitle">Bradley High Class Fund</h1>
-        <p className="homeSubtitle">
-          An experiential student-selected investment portfolio focused on long-term capital appreciation.
+    <main className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-300 p-6">
+
+      {/* Header */}
+      <div className="max-w-5xl mx-auto text-center mb-8">
+        <h1 className="text-4xl font-semibold text-slate-900">
+          Bradley High Class Fund
+        </h1>
+        <p className="text-slate-600 mt-2">
+          An experiential student-selected investment portfolio focused on long-term capital appreciation
         </p>
+      </div>
 
-        <div className="kpiRow">
-          <div className="kpi">
-            <div className="kpiLabel">Portfolio Value</div>
-            <div className="kpiValue">{formatCurrency(portfolioValue)}</div>
+      {/* Portfolio Value */}
+      <div className="max-w-5xl mx-auto mb-8">
+        <div className="bg-white/90 rounded-3xl shadow-xl border border-slate-200 p-6 text-center">
+          <h2 className="text-lg text-slate-600">Portfolio Value</h2>
+          <p className="text-4xl font-bold text-slate-900 mt-2">
+            $197,313.42
+          </p>
+        </div>
+      </div>
+
+      {/* Performance Chart */}
+      <div className="max-w-5xl mx-auto mb-8">
+        <div className="bg-white/90 rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+          <div className="px-6 py-4 bg-slate-100 border-b border-slate-200">
+            <h2 className="text-xl font-semibold text-center text-slate-900">
+              Portfolio Performance
+            </h2>
           </div>
 
-          <div className="kpi">
-            <div className="kpiLabel">Daily Portfolio Change</div>
-            <div className={`kpiValue ${portfolioClass}`}>{formatPercent(portfolioDailyChange)}</div>
+          <div className="p-6">
+            <Image
+              src="/performance.png"
+              alt="Portfolio performance"
+              width={1400}
+              height={800}
+              className="w-full h-auto rounded-xl border border-slate-200"
+              priority
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Beta Chart */}
+      <div className="max-w-5xl mx-auto mb-8">
+        <div className="bg-white/90 rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+          <div className="px-6 py-4 bg-slate-100 border-b border-slate-200">
+            <h2 className="text-xl font-semibold text-center text-slate-900">
+              Portfolio Beta Over Time
+            </h2>
           </div>
 
-          <div className="kpi">
-            <div className="kpiLabel">S&amp;P 500 Daily Change</div>
-            <div className={`kpiValue ${spClass}`}>{formatPercent(sp500DailyChange)}</div>
+          <div className="p-6">
+            <Image
+              src="/portfolio_beta_homepage.png"
+              alt="Portfolio beta over time"
+              width={1400}
+              height={800}
+              className="w-full h-auto rounded-xl border border-slate-200"
+            />
           </div>
         </div>
+      </div>
 
-        {/* Existing Performance Chart */}
-        <div className="chartBox">
-          <div className="chartHeader">Portfolio Value Over Time</div>
-
-          <img
-            src="/performance.png"
-            alt="Portfolio performance"
-            className="performanceImage"
-          />
-        </div>
-
-        {/* NEW Beta Chart */}
-        <div className="chartBox">
-          <div className="chartHeader">Portfolio Beta Over Time</div>
-
-          <img
-            src="/portfolio_beta.png"
-            alt="Portfolio beta over time"
-            className="performanceImage"
-          />
-        </div>
-      </section>
     </main>
   );
 }

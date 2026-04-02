@@ -77,9 +77,10 @@ export default function HomePage() {
     <main className="homeShell">
       <section className="hero">
         <h1 className="title">Bradley High Class Fund</h1>
+
         <p className="subtitle">
-          An experiential student-selected investment portfolio focused on
-          long-term capital appreciation.
+          An experiential student-selected investment portfolio focused on long-term
+          capital appreciation.
         </p>
 
         <div className="kpiRow">

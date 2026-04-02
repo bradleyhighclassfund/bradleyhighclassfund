@@ -21,7 +21,6 @@ export default function HomePage() {
 
     async function fetchSP500() {
       try {
-        // If your endpoint name differs, change it here
         const res = await fetch("/api/sp500");
         const data = await res.json();
         setSp500DailyChange(typeof data.dailyChange === "number" ? data.dailyChange : null);
@@ -71,10 +70,26 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Existing Performance Chart */}
         <div className="chartBox">
           <div className="chartHeader">Portfolio Value Over Time</div>
 
-          <img src="/performance.png" alt="Portfolio performance" className="performanceImage" />
+          <img
+            src="/performance.png"
+            alt="Portfolio performance"
+            className="performanceImage"
+          />
+        </div>
+
+        {/* NEW Beta Chart */}
+        <div className="chartBox">
+          <div className="chartHeader">Portfolio Beta Over Time</div>
+
+          <img
+            src="/portfolio_beta.png"
+            alt="Portfolio beta over time"
+            className="performanceImage"
+          />
         </div>
       </section>
     </main>

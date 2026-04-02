@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Bradley High Class Fund",
@@ -13,12 +14,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="top-nav">
           <div className="top-nav-inner">
             <nav>
-              <a href="/">Home</a>
-              <a href="/about">About</a>
-              <a href="/portfolio">Portfolio</a>
-              <a href="/methodology">Method</a>
-              <a href="/actions">Actions</a>
-              <a href="/ondeck">On Deck</a>
+              <Link href="/">Home</Link>
+              <Link href="/about">About</Link>
+              <Link href="/portfolio">Portfolio</Link>
+              <Link href="/methodology">Method</Link>
+              <Link href="/actions">Actions</Link>
+              <Link href="/on-deck">On Deck</Link>
             </nav>
           </div>
         </header>

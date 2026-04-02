@@ -1,54 +1,117 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+
+export default function HomePage() {
+  const [portfolioValue, setPortfolioValue] = useState<number | null>(null);
+  const [portfolioDailyChange, setPortfolioDailyChange] = useState<number | null>(null);
+  const [sp500DailyChange, setSp500DailyChange] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function fetchPortfolio() {
+      try {
+        const res = await fetch("/api/portfolio");
+        const data = await res.json();
+
+        setPortfolioValue(
+          typeof data.totalMarketValue === "number" ? data.totalMarketValue : null
+        );
+        setPortfolioDailyChange(
+          typeof data.dailyChange === "number" ? data.dailyChange : null
+        );
+
+        if (typeof data.sp500DailyChange === "number") {
+          setSp500DailyChange(data.sp500DailyChange);
+        }
+      } catch (e) {
+        console.error("Error fetching portfolio:", e);
+      }
+    }
+
+    async function fetchSP500() {
+      try {
+        const res = await fetch("/api/sp500");
+        const data = await res.json();
+
+        setSp500DailyChange(
+          typeof data.dailyChange === "number" ? data.dailyChange : null
+        );
+      } catch (e) {
+        console.error("Error fetching S&P 500:", e);
+        setSp500DailyChange(null);
+      }
+    }
+
+    fetchPortfolio();
+    fetchSP500();
+  }, []);
+
+  const formatCurrency = (val: number | null) =>
+    val !== null
+      ? val.toLocaleString("en-US", {
+          style: "currency",
+          currency: "USD",
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : "—";
+
+  const formatPercent = (val: number | null) =>
+    val !== null ? `${val >= 0 ? "+" : ""}${val.toFixed(2)}%` : "—";
+
+  const portfolioClass =
+    portfolioDailyChange !== null
+      ? portfolioDailyChange >= 0
+        ? "pos"
+        : "neg"
+      : "";
+
+  const spClass =
+    sp500DailyChange !== null ? (sp500DailyChange >= 0 ? "pos" : "neg") : "";
+
   return (
-    <main className="min-h-screen bg-white p-6">
-
-      {/* Header */}
-      <div className="text-center mb-6">
-        <h1 className="text-3xl font-semibold">
-          Bradley High Class Fund
-        </h1>
-        <p className="text-gray-600 mt-2">
-          An experiential student-selected investment portfolio focused on long-term capital appreciation
-        </p>
-      </div>
-
-      {/* Portfolio Value */}
-      <div className="text-center mb-8">
-        <h2 className="text-lg text-gray-600">Portfolio Value</h2>
-        <p className="text-3xl font-bold">$197,313.42</p>
-      </div>
-
-      {/* Performance Chart */}
-      <div className="mb-6">
-        <Image
-          src="/performance.png"
-          alt="Portfolio performance"
-          width={1400}
-          height={800}
-          className="w-full h-auto"
-          priority
-        />
-      </div>
-
-      {/* Beta Chart (NEW — centered + smaller) */}
-      <div className="mt-6 text-center">
-        <p className="text-gray-700 mb-2">
-          Portfolio Beta Over Time
+    <main className="homeShell">
+      <section className="hero">
+        <h1 className="title">Bradley High Class Fund</h1>
+        <p className="subtitle">
+          An experiential student-selected investment portfolio focused on long-term capital appreciation.
         </p>
 
-        <div className="flex justify-center">
-          <Image
+        <div className="kpiRow">
+          <div className="kpi">
+            <div className="kpiLabel">Portfolio Value</div>
+            <div className="kpiValue">{formatCurrency(portfolioValue)}</div>
+          </div>
+
+          <div className="kpi">
+            <div className="kpiLabel">Daily Portfolio Change</div>
+            <div className={`kpiValue ${portfolioClass}`}>
+              {formatPercent(portfolioDailyChange)}
+            </div>
+          </div>
+
+          <div className="kpi">
+            <div className="kpiLabel">S&amp;P 500 Daily Change</div>
+            <div className={`kpiValue ${spClass}`}>
+              {formatPercent(sp500DailyChange)}
+            </div>
+          </div>
+        </div>
+
+        <div className="chartBox">
+          <div className="chartHeader">Portfolio Value Over Time</div>
+          <img
+            src="/performance.png"
+            alt="Portfolio performance"
+            className="performanceImage"
+          />
+          <img
             src="/portfolio_beta_homepage.png"
             alt="Portfolio beta over time"
-            width={900}
-            height={500}
-            className="w-full max-w-3xl h-auto"
+            className="performanceImage"
           />
         </div>
-      </div>
-
+      </section>
     </main>
   );
 }

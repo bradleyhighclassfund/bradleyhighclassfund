@@ -112,8 +112,8 @@ export async function GET() {
       {
         last_updated: new Date().toISOString(),
         quote_source: "yahoo_chart_endpoint",
-        pitch_date: "2026-04-28",
-        performance_base_date: "2026-04-24",
+        pitch_date: "2026-04-18",
+        performance_base_date: "2026-04-17",
         items: results,
       },
       { status: 200 }

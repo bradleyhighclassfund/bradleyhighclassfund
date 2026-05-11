@@ -6,8 +6,9 @@ type Candidate = {
   ticker: string;
   name: string;
   currentPrice: number | null;
-  oneYearPerformance: number | null;
-  fiveYearPerformance: number | null;
+  pitchedPrice: number | null;
+  pitchedPerformance: number | null;
+  selected?: boolean;
 };
 
 type ApiResponse = {
@@ -35,6 +36,10 @@ function perfColor(value: number | null) {
   return value >= 0 ? "#166534" : "#b91c1c";
 }
 
+function isSelected(ticker: string) {
+  return ticker === "UBER" || ticker === "PANW";
+}
+
 export default function OnDeckPage() {
   const [items, setItems] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +54,10 @@ export default function OnDeckPage() {
         setLoading(true);
         setError(null);
 
-        const res = await fetch("/api/on-deck", { cache: "no-store" });
+        const res = await fetch("/api/on-deck", {
+          cache: "no-store",
+        });
+
         const data: ApiResponse = await res.json();
 
         if (!mounted) return;
@@ -65,6 +73,7 @@ export default function OnDeckPage() {
         setLastUpdated(data?.last_updated ?? null);
       } catch {
         if (!mounted) return;
+
         setError("Failed to load on-deck candidates.");
         setItems([]);
         setLastUpdated(null);
@@ -74,6 +83,7 @@ export default function OnDeckPage() {
     }
 
     load();
+
     return () => {
       mounted = false;
     };
@@ -83,6 +93,7 @@ export default function OnDeckPage() {
     if (!lastUpdated) return null;
 
     const dt = new Date(lastUpdated);
+
     if (Number.isNaN(dt.getTime())) return null;
 
     return dt.toLocaleString("en-US", {
@@ -125,7 +136,8 @@ export default function OnDeckPage() {
             lineHeight: 1.6,
           }}
         >
-          Firm(s) to be selected April 4 and included in portfolio following week.
+          Candidate firms pitched on April 28, 2026. Performance is measured
+          from the market close on Friday, April 24, 2026.
         </p>
 
         {updatedText && !loading && !error ? (
@@ -165,9 +177,10 @@ export default function OnDeckPage() {
               fontWeight: 700,
               color: "#111827",
               fontSize: "1rem",
+              textAlign: "center",
             }}
           >
-            Candidate Firms
+            Candidate Firms — Executive MBA 2026 Cohort
           </div>
 
           {loading ? (
@@ -212,6 +225,7 @@ export default function OnDeckPage() {
                     >
                       Ticker
                     </th>
+
                     <th
                       style={{
                         textAlign: "left",
@@ -223,6 +237,19 @@ export default function OnDeckPage() {
                     >
                       Firm Name
                     </th>
+
+                    <th
+                      style={{
+                        textAlign: "right",
+                        padding: "16px 22px",
+                        fontSize: "0.92rem",
+                        color: "#374151",
+                        borderBottom: "1px solid #e5e7eb",
+                      }}
+                    >
+                      Pitch-Date Close
+                    </th>
+
                     <th
                       style={{
                         textAlign: "right",
@@ -234,6 +261,7 @@ export default function OnDeckPage() {
                     >
                       Current Price
                     </th>
+
                     <th
                       style={{
                         textAlign: "right",
@@ -243,84 +271,90 @@ export default function OnDeckPage() {
                         borderBottom: "1px solid #e5e7eb",
                       }}
                     >
-                      1-Year Performance
-                    </th>
-                    <th
-                      style={{
-                        textAlign: "right",
-                        padding: "16px 22px",
-                        fontSize: "0.92rem",
-                        color: "#374151",
-                        borderBottom: "1px solid #e5e7eb",
-                      }}
-                    >
-                      5-Year Performance
+                      Performance Since Pitch
                     </th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {items.map((item) => (
-                    <tr key={item.ticker}>
-                      <td
-                        style={{
-                          padding: "18px 22px",
-                          borderBottom: "1px solid #f1f5f9",
-                          fontWeight: 700,
-                          color: "#111827",
-                          letterSpacing: "0.02em",
-                        }}
-                      >
-                        {item.ticker}
-                      </td>
+                  {items.map((item) => {
+                    const selected =
+                      item.selected ?? isSelected(item.ticker);
 
-                      <td
-                        style={{
-                          padding: "18px 22px",
-                          borderBottom: "1px solid #f1f5f9",
-                          color: "#111827",
-                        }}
-                      >
-                        {item.name}
-                      </td>
+                    return (
+                      <tr key={item.ticker}>
+                        <td
+                          style={{
+                            padding: "18px 22px",
+                            borderBottom: "1px solid #f1f5f9",
+                            fontWeight: 700,
+                            color: "#111827",
+                            letterSpacing: "0.02em",
+                          }}
+                        >
+                          {item.ticker}
 
-                      <td
-                        style={{
-                          padding: "18px 22px",
-                          borderBottom: "1px solid #f1f5f9",
-                          textAlign: "right",
-                          color: "#111827",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {formatPrice(item.currentPrice)}
-                      </td>
+                          {selected ? (
+                            <span
+                              style={{
+                                marginLeft: "8px",
+                                color: "#16a34a",
+                                fontWeight: 800,
+                              }}
+                            >
+                              ✓
+                            </span>
+                          ) : null}
+                        </td>
 
-                      <td
-                        style={{
-                          padding: "18px 22px",
-                          borderBottom: "1px solid #f1f5f9",
-                          textAlign: "right",
-                          color: perfColor(item.oneYearPerformance),
-                          fontWeight: 600,
-                        }}
-                      >
-                        {formatPercent(item.oneYearPerformance)}
-                      </td>
+                        <td
+                          style={{
+                            padding: "18px 22px",
+                            borderBottom: "1px solid #f1f5f9",
+                            color: "#111827",
+                          }}
+                        >
+                          {item.name}
+                        </td>
 
-                      <td
-                        style={{
-                          padding: "18px 22px",
-                          borderBottom: "1px solid #f1f5f9",
-                          textAlign: "right",
-                          color: perfColor(item.fiveYearPerformance),
-                          fontWeight: 600,
-                        }}
-                      >
-                        {formatPercent(item.fiveYearPerformance)}
-                      </td>
-                    </tr>
-                  ))}
+                        <td
+                          style={{
+                            padding: "18px 22px",
+                            borderBottom: "1px solid #f1f5f9",
+                            textAlign: "right",
+                            color: "#111827",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {formatPrice(item.pitchedPrice)}
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "18px 22px",
+                            borderBottom: "1px solid #f1f5f9",
+                            textAlign: "right",
+                            color: "#111827",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {formatPrice(item.currentPrice)}
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "18px 22px",
+                            borderBottom: "1px solid #f1f5f9",
+                            textAlign: "right",
+                            color: perfColor(item.pitchedPerformance),
+                            fontWeight: 600,
+                          }}
+                        >
+                          {formatPercent(item.pitchedPerformance)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

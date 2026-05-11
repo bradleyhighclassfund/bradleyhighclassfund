@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "Bradley High Class Fund",
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             not constitute investment advice or an offer to buy or sell securities.
           </div>
         </footer>
+        <Analytics />
       </body>
     </html>
   );

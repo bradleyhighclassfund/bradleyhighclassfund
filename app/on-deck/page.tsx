@@ -137,7 +137,8 @@ export default function OnDeckPage() {
           }}
         >
           Candidate firms pitched on April 18, 2026. Performance is measured
-          from the market close on Friday, April 17, 2026.
+          from the market close on Friday, April 17, 2026. Green check mark 
+          identifies firms selected.
         </p>
 
         {updatedText && !loading && !error ? (

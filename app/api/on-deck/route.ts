@@ -24,7 +24,7 @@ const CANDIDATES: Candidate[] = [
   {
     ticker: "NOW",
     name: "ServiceNow, Inc.",
-    pitchedPrice: 994.35,
+    pitchedPrice: 96.66,
     selected: false,
   },
   {
@@ -36,13 +36,13 @@ const CANDIDATES: Candidate[] = [
   {
     ticker: "IOVA",
     name: "Iovance Biotherapeutics, Inc.",
-    pitchedPrice: 1.54,
+    pitchedPrice: 3.86,
     selected: false,
   },
   {
     ticker: "TWST",
     name: "Twist Bioscience Corporation",
-    pitchedPrice: 34.76,
+    pitchedPrice: 59.81,
     selected: false,
   },
 ];
@@ -78,7 +78,9 @@ async function fetchCurrentPrice(ticker: string): Promise<number | null> {
     if (!res.ok) return null;
 
     const data = await res.json();
-    const closes = data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
+
+    const closes =
+      data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
 
     if (!Array.isArray(closes)) return null;
 
@@ -103,7 +105,10 @@ export async function GET() {
         return {
           ...candidate,
           currentPrice,
-          pitchedPerformance: pctChange(currentPrice, candidate.pitchedPrice),
+          pitchedPerformance: pctChange(
+            currentPrice,
+            candidate.pitchedPrice
+          ),
         } satisfies CandidateWithPerformance;
       })
     );

@@ -136,8 +136,8 @@ export default function OnDeckPage() {
             lineHeight: 1.6,
           }}
         >
-          Candidate firms pitched on April 28, 2026. Performance is measured
-          from the market close on Friday, April 24, 2026.
+          Candidate firms pitched on April 18, 2026. Performance is measured
+          from the market close on Friday, April 17, 2026.
         </p>
 
         {updatedText && !loading && !error ? (
